@@ -36,7 +36,7 @@ class OrderController extends Controller
 
     public function show(Order $order): JsonResponse
     {
-        $order->load(['items', 'checkoutValues', 'statusHistory', 'notes']);
+        $order->load(['items.product', 'items.variant', 'checkoutValues', 'statusHistory', 'notes']);
 
         return response()->json(['data' => ['order' => $order, 'is_editable' => in_array($order->status, ['nouvelle', 'confirmee'], true), 'allowed_transitions' => $this->transitions($order->status), 'meta_purchase' => ['event_id' => $order->meta_event_id, 'status' => 'not_configured']]]);
     }
