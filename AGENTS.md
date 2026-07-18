@@ -76,17 +76,17 @@ Every pull request must explain scope, affected documents, security/privacy impa
 
 Security, privacy, and performance are release requirements. Follow `docs/security.md`, `docs/privacy.md`, and `docs/design.md`.
 
-### Phase Branch Workflow
+### Milestone Branch Workflow
 
-Implement each documented phase on its own branch. Start from the current `main` only after the previous phase has been confirmed and merged.
+Implement all phases belonging to one documented milestone on one dedicated branch. Start the next milestone from the current `main` only after the previous milestone has been confirmed and merged.
 
 ```text
-phase/01-foundation
-phase/02-catalog
+milestone/01-foundation
+milestone/02-catalog-storefront
 fix/meta-event-deduplication
 ```
 
-Do not combine phases in one branch or merge a phase into `main` without explicit confirmation that its acceptance criteria, tests, security review, and performance checks pass. Keep phase branches focused; use a separate `fix/*` branch for scoped corrections.
+Keep each milestone branch focused. Do not merge a milestone into `main` without explicit confirmation that its phases' acceptance criteria, tests, security review, and performance checks pass. Use a separate `fix/*` branch for scoped corrections.
 
 ### Meta Pixel Reliability
 

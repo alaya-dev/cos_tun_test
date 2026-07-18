@@ -2,7 +2,9 @@
 
 namespace App\Domain\Catalog\Models;
 
+use App\Domain\Catalog\Services\CatalogCacheVersion;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -26,10 +28,25 @@ class ProductImage extends Model
     protected static function booted(): void
     {
         static::creating(fn (self $model) => $model->public_id ??= (string) Str::ulid());
+        static::saved(fn () => app(CatalogCacheVersion::class)->bump());
+        static::deleted(fn () => app(CatalogCacheVersion::class)->bump());
     }
 
     public function getRouteKeyName(): string
     {
         return 'public_id';
+    }
+
+    public function publicUrl(): ?string
+    {
+        return $this->path ? Storage::disk('public')->url($this->path) : null;
+    }
+
+    /** @return array<int, string> */
+    public function publicRenditions(): array
+    {
+        return collect($this->renditions ?? [])
+            ->mapWithKeys(fn (string $path, int|string $width): array => [(int) $width => Storage::disk('public')->url($path)])
+            ->all();
     }
 }

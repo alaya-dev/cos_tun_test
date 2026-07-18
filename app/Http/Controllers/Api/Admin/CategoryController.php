@@ -82,6 +82,6 @@ class CategoryController extends Controller
         $category = $request->route('category');
         $ignoreId = $category instanceof Category ? ','.$category->id : '';
 
-        return $request->validate(['name' => [$required ? 'required' : 'sometimes', 'string', 'between:2,160'], 'slug' => ['nullable', 'string', 'max:190', 'unique:categories,slug'.$ignoreId], 'is_active' => [$required ? 'required' : 'sometimes', 'boolean'], 'sort_order' => [$required ? 'required' : 'sometimes', 'integer', 'min:0'], 'seo_title' => ['nullable', 'string', 'max:255'], 'seo_description' => ['nullable', 'string', 'max:320']]);
+        return $request->validate(['name' => [$required ? 'required' : 'sometimes', 'string', 'between:2,160'], 'slug' => ['nullable', 'string', 'max:190', 'unique:categories,slug'.$ignoreId], 'description' => ['nullable', 'string', 'max:5000'], 'is_active' => [$required ? 'required' : 'sometimes', 'boolean'], 'sort_order' => [$required ? 'required' : 'sometimes', 'integer', 'min:0'], 'seo_title' => ['nullable', 'string', 'max:255'], 'seo_description' => ['nullable', 'string', 'max:320']]);
     }
 }
