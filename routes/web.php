@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\StorefrontCatalogController;
+use App\Http\Controllers\AdminAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [StorefrontCatalogController::class, 'home'])->name('storefront.home');
@@ -12,4 +13,7 @@ Route::get('/panier', [StorefrontCatalogController::class, 'cart'])->name('store
 Route::get('/commande', [StorefrontCatalogController::class, 'checkout'])->name('storefront.checkout');
 Route::get('/commande/confirmee/{order}', [StorefrontCatalogController::class, 'confirmation'])->middleware('signed')->name('storefront.confirmation');
 
-Route::view('/admin', 'admin.app')->name('admin.app');
+Route::get('/admin/login', [AdminAuthController::class, 'create'])->name('login');
+Route::post('/admin/login', [AdminAuthController::class, 'store'])->middleware('throttle:5,1')->name('admin.login');
+Route::post('/admin/logout', [AdminAuthController::class, 'destroy'])->middleware('auth')->name('admin.logout');
+Route::view('/admin', 'admin.app')->middleware('auth')->name('admin.app');
