@@ -1,0 +1,72 @@
+<?php
+
+namespace Tests\Feature\Catalog;
+
+use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\Product;
+use App\Domain\Catalog\Models\ProductImage;
+use App\Jobs\ProcessProductImage;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class CatalogSearchAndMediaTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_search_returns_only_active_catalogue_items_in_the_public_contract(): void
+    {
+        $activeCategory = Category::query()->create(['name' => 'Crèmes', 'slug' => 'cremes', 'is_active' => true]);
+        $inactiveCategory = Category::query()->create(['name' => 'Crème inactive', 'slug' => 'creme-inactive', 'is_active' => false]);
+        Product::query()->create(['category_id' => $activeCategory->id, 'name' => 'Crème visage', 'slug' => 'creme-visage', 'regular_price_millimes' => 12_500, 'stock_quantity' => 3, 'is_active' => true]);
+        Product::query()->create(['category_id' => $inactiveCategory->id, 'name' => 'Crème cachée', 'slug' => 'creme-cachee', 'regular_price_millimes' => 12_500, 'stock_quantity' => 3, 'is_active' => true]);
+
+        $this->getJson('/api/v1/public/search/suggestions?q=crème')
+            ->assertOk()
+            ->assertJsonPath('data.products.0.name', 'Crème visage')
+            ->assertJsonPath('data.products.0.effective_price.millimes', 12_500)
+            ->assertJsonPath('data.products.0.effective_price.formatted', '12,500 TND')
+            ->assertJsonCount(1, 'data.products')
+            ->assertJsonCount(1, 'data.categories');
+    }
+
+    public function test_product_image_is_staged_then_processed_into_webp_renditions(): void
+    {
+        Queue::fake();
+        Storage::fake('local');
+        Storage::fake('public');
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage', 'is_active' => true]);
+        $product = Product::query()->create(['category_id' => $category->id, 'name' => 'Crème', 'slug' => 'creme', 'regular_price_millimes' => 12_500, 'stock_quantity' => 3, 'is_active' => false]);
+
+        $this->actingAs($admin, 'sanctum')->postJson('/api/v1/admin/products/'.$product->public_id.'/images', [
+            'image' => UploadedFile::fake()->image('creme.jpg', 1600, 1000),
+            'is_primary' => true,
+        ])->assertCreated()->assertJsonPath('data.processing_status', 'pending');
+
+        $image = ProductImage::query()->firstOrFail();
+        Storage::disk('local')->assertExists($image->original_path);
+        Queue::assertPushed(ProcessProductImage::class, fn (ProcessProductImage $job) => true);
+
+        (new ProcessProductImage($image->id))->handle();
+        $image->refresh();
+        $this->assertSame('ready', $image->processing_status);
+        $this->assertSame([480, 768, 1200], array_keys($image->renditions));
+        Storage::disk('public')->assertExists($image->renditions['1200']);
+        Storage::disk('local')->assertMissing($image->original_path);
+    }
+
+    public function test_product_image_rejects_an_invalid_image_signature(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage', 'is_active' => true]);
+        $product = Product::query()->create(['category_id' => $category->id, 'name' => 'Crème', 'slug' => 'creme', 'regular_price_millimes' => 12_500, 'stock_quantity' => 3, 'is_active' => false]);
+
+        $this->actingAs($admin, 'sanctum')->postJson('/api/v1/admin/products/'.$product->public_id.'/images', [
+            'image' => UploadedFile::fake()->createWithContent('not-an-image.jpg', 'not an image'),
+        ])->assertStatus(422);
+    }
+}

@@ -74,7 +74,7 @@ Every pull request must explain scope, affected documents, security/privacy impa
 
 ## Security, Performance & Agent Instructions
 
-Security, privacy, and performance are release requirements. Follow `docs/security-rules.md`, `docs/privacy.md`, and `docs/design.md`.
+Security, privacy, and performance are release requirements. Follow `docs/security.md`, `docs/privacy.md`, and `docs/design.md`.
 
 ### Phase Branch Workflow
 
