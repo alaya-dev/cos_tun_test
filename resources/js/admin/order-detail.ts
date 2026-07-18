@@ -1,64 +1,25 @@
 import { onMounted, ref, type Component } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 
-type ProductRef = { public_id: string; name: string; has_variants: boolean };
-type VariantRef = { public_id: string };
-type OrderItem = { product_name_snapshot: string; variant_snapshot: { group: string; value: string }[] | null; quantity: number; effective_unit_price_millimes: number; line_total_millimes: number; product: ProductRef | null; variant: VariantRef | null };
-type EditableLine = { product_public_id: string; variant_public_id: string | null; quantity: number; label: string };
-type History = { from_status: string; to_status: string; reason: string | null; created_at?: string };
-type Note = { body: string; created_at?: string };
-type AdminOrder = { public_reference: string; lock_version: number; customer_name: string; customer_phone: string; customer_city: string; customer_address: string; status: string; subtotal_millimes: number; shipping_fee_millimes: number; total_millimes: number; items: OrderItem[]; notes: Note[]; status_history: History[] };
-type Detail = { order: AdminOrder; is_editable: boolean; allowed_transitions: string[]; meta_purchase: { event_id: string; status: string } };
-
+type Variant = { public_id: string; sku: string | null; is_active: boolean; values: { value: string }[] };
+type Product = { public_id: string; variants: Variant[] };
+type Item = { product_name_snapshot: string; quantity: number; line_total_millimes: number; product: Product | null; variant: Variant | null };
+type Order = { public_reference: string; lock_version: number; customer_name: string; customer_phone: string; customer_city: string; customer_address: string; status: string; total_millimes: number; items: Item[]; notes: { body: string }[]; status_history: { from_status: string; to_status: string; reason: string | null }[] };
+type Detail = { order: Order; is_editable: boolean; allowed_transitions: string[]; meta_purchase: { status: string } };
+type Line = { product_public_id: string; variant_public_id: string | null; quantity: number; label: string; variants: Variant[] };
 const money = (value: number) => `${(value / 1000).toFixed(3).replace('.', ',')} TND`;
-
-async function request<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
-    const response = await fetch(`/api/v1/admin/${path}`, { method, credentials: 'same-origin', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-    if (!response.ok) { const payload = await response.json().catch(() => null) as { message?: string } | null; throw new Error(payload?.message || 'Cette opération est momentanément indisponible.'); }
-    return response.json() as Promise<T>;
-}
+async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> { const response = await fetch(`/api/v1/admin/${path}`, { method, credentials: 'same-origin', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }); if (!response.ok) { const data = await response.json().catch(() => null) as { message?: string } | null; throw new Error(data?.message || 'Opération impossible.'); } return response.json() as Promise<T>; }
 
 const OrderDetailView: Component = {
     components: { RouterLink },
     setup() {
-        const route = useRoute();
-        const detail = ref<Detail | null>(null);
-        const lines = ref<EditableLine[]>([]);
-        const loading = ref(true);
-        const saving = ref(false);
-        const error = ref('');
-        const note = ref('');
-        const customer = ref({ full_name: '', phone: '', city: '', address: '' });
-        const refresh = async () => {
-            const next = (await request<{ data: Detail }>(`orders/${route.params.reference}`)).data;
-            detail.value = next;
-            customer.value = { full_name: next.order.customer_name, phone: next.order.customer_phone, city: next.order.customer_city, address: next.order.customer_address };
-            lines.value = next.order.items.flatMap(item => item.product ? [{ product_public_id: item.product.public_id, variant_public_id: item.variant?.public_id || null, quantity: item.quantity, label: item.product_name_snapshot }] : []);
-        };
+        const route = useRoute(); const detail = ref<Detail | null>(null); const lines = ref<Line[]>([]); const customer = ref({ full_name: '', phone: '', city: '', address: '' }); const note = ref(''); const loading = ref(true); const saving = ref(false); const error = ref('');
+        const refresh = async () => { const next = (await api<{ data: Detail }>(`orders/${route.params.reference}`)).data; detail.value = next; customer.value = { full_name: next.order.customer_name, phone: next.order.customer_phone, city: next.order.customer_city, address: next.order.customer_address }; lines.value = next.order.items.flatMap(item => item.product ? [{ product_public_id: item.product.public_id, variant_public_id: item.variant?.public_id || null, quantity: item.quantity, label: item.product_name_snapshot, variants: item.product.variants.filter(variant => variant.is_active) }] : []); };
         onMounted(async () => { try { await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { loading.value = false; } });
-        const saveCustomer = async () => {
-            if (!detail.value) return;
-            saving.value = true; error.value = '';
-            try { await request(`orders/${detail.value.order.public_reference}`, 'PATCH', { lock_version: detail.value.order.lock_version, customer: customer.value }); await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; }
-        };
-        const saveItems = async () => {
-            if (!detail.value || !lines.value.length) return;
-            saving.value = true; error.value = '';
-            try { await request(`orders/${detail.value.order.public_reference}/items`, 'PUT', { lock_version: detail.value.order.lock_version, items: lines.value.map(({ product_public_id, variant_public_id, quantity }) => ({ product_public_id, variant_public_id, quantity })) }); await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; }
-        };
-        const transition = async (status: string) => {
-            if (!detail.value) return;
-            saving.value = true; error.value = '';
-            try { await request(`orders/${detail.value.order.public_reference}/transitions`, 'POST', { to_status: status, lock_version: detail.value.order.lock_version, reason: ['annulee', 'echec_livraison', 'retournee'].includes(status) ? 'Décision opérateur' : null, restock_items: status === 'retournee' }); await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; }
-        };
-        const addNote = async () => {
-            if (!detail.value || !note.value.trim()) return;
-            saving.value = true;
-            try { await request(`orders/${detail.value.order.public_reference}/notes`, 'POST', { body: note.value.trim() }); note.value = ''; await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; }
-        };
-        return { detail, lines, loading, saving, error, customer, note, saveCustomer, saveItems, transition, addNote, money, print: () => window.print() };
+        const run = async (path: string, method: string, body: unknown) => { saving.value = true; error.value = ''; try { await api(path, method, body); await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; } };
+        return { detail, lines, customer, note, loading, saving, error, money, print: () => window.print(), saveCustomer: () => detail.value && run(`orders/${detail.value.order.public_reference}`, 'PATCH', { lock_version: detail.value.order.lock_version, customer: customer.value }), saveItems: () => detail.value && run(`orders/${detail.value.order.public_reference}/items`, 'PUT', { lock_version: detail.value.order.lock_version, items: lines.value.map(({ product_public_id, variant_public_id, quantity }) => ({ product_public_id, variant_public_id, quantity })) }), transition: (status: string) => detail.value && run(`orders/${detail.value.order.public_reference}/transitions`, 'POST', { to_status: status, lock_version: detail.value.order.lock_version, reason: ['annulee', 'echec_livraison', 'retournee'].includes(status) ? 'Décision opérateur' : null, restock_items: status === 'retournee' }), addNote: () => detail.value && note.value.trim() && run(`orders/${detail.value.order.public_reference}/notes`, 'POST', { body: note.value.trim() }) };
     },
-    template: '<section class="admin-page"><RouterLink class="text-link" to="/orders">Retour aux commandes</RouterLink><p v-if="loading">Chargement…</p><p v-else-if="error" class="admin-alert">{{ error }}</p><template v-else-if="detail"><header><div><p class="admin-eyebrow">Commande</p><h1>{{ detail.order.public_reference }}</h1></div><button class="admin-action" @click="print">Imprimer</button></header><div class="admin-order-summary"><p><strong>{{ detail.order.status }}</strong></p><p>{{ money(detail.order.total_millimes) }}</p><small>Suivi Meta: {{ detail.meta_purchase.status }}</small></div><section class="admin-order-section"><h2>Articles</h2><div class="admin-table"><article v-for="item in detail.order.items"><div><strong>{{ item.product_name_snapshot }}</strong><small v-if="item.variant_snapshot">{{ item.variant_snapshot.map(value => value.value).join(\' · \') }}</small></div><span>× {{ item.quantity }}</span><span>{{ money(item.line_total_millimes) }}</span></article></div><form v-if="detail.is_editable" class="admin-form admin-order-lines" @submit.prevent="saveItems"><label v-for="line in lines">{{ line.label }}<input v-model.number="line.quantity" type="number" min="1" max="99" required></label><button class="admin-action" :disabled="saving">Recalculer les articles</button></form><dl class="admin-totals"><div><dt>Sous-total</dt><dd>{{ money(detail.order.subtotal_millimes) }}</dd></div><div><dt>Livraison</dt><dd>{{ money(detail.order.shipping_fee_millimes) }}</dd></div><div><dt>Total</dt><dd>{{ money(detail.order.total_millimes) }}</dd></div></dl></section><div class="admin-actions"><button v-for="status in detail.allowed_transitions" class="admin-action" :disabled="saving" @click="transition(status)">{{ status }}</button></div><section class="admin-order-section"><h2>Livraison</h2><form v-if="detail.is_editable" class="admin-form" @submit.prevent="saveCustomer"><label>Nom complet<input v-model.trim="customer.full_name" minlength="2" maxlength="180" required></label><label>Téléphone<input v-model.trim="customer.phone" maxlength="40" required></label><label>Ville<input v-model.trim="customer.city" minlength="2" maxlength="160" required></label><label>Adresse<textarea v-model="customer.address" minlength="5" maxlength="2000" required></textarea></label><button class="admin-action" :disabled="saving">Mettre à jour</button></form><p v-else class="admin-empty">Les informations de livraison sont figées pour cette commande.</p></section><section class="admin-order-section"><h2>Notes internes</h2><form class="admin-form" @submit.prevent="addNote"><label>Note<textarea v-model="note" maxlength="5000" required></textarea></label><button class="admin-action" :disabled="saving">Ajouter la note</button></form><div v-if="detail.order.notes.length" class="admin-table"><article v-for="item in detail.order.notes"><strong>Note interne</strong><small>{{ item.body }}</small></article></div></section><section v-if="detail.order.status_history.length" class="admin-order-section"><h2>Historique</h2><div class="admin-table"><article v-for="item in detail.order.status_history"><strong>{{ item.from_status }} → {{ item.to_status }}</strong><small>{{ item.reason || \'Sans motif\' }}</small></article></div></section></template></section>',
+    // eslint-disable-next-line quotes
+    template: `<section class="admin-page"><RouterLink class="text-link" to="/orders">Retour aux commandes</RouterLink><p v-if="loading">Chargement…</p><p v-else-if="error" class="admin-alert">{{ error }}</p><template v-else-if="detail"><header><div><p class="admin-eyebrow">Commande</p><h1>{{ detail.order.public_reference }}</h1></div><button class="admin-action" @click="print">Imprimer</button></header><div class="admin-order-summary"><p><strong>{{ detail.order.status }}</strong></p><p>{{ money(detail.order.total_millimes) }}</p><small>Suivi Meta: {{ detail.meta_purchase.status }}</small></div><section class="admin-order-section"><h2>Articles</h2><form v-if="detail.is_editable" class="admin-form" @submit.prevent="saveItems"><div v-for="line in lines" class="admin-line-editor"><strong>{{ line.label }}</strong><label>Quantité<input v-model.number="line.quantity" type="number" min="1" max="99" required></label><label v-if="line.variants.length">Variante<select v-model="line.variant_public_id" required><option v-for="variant in line.variants" :value="variant.public_id">{{ variant.sku || variant.values.map(value => value.value).join(' · ') }}</option></select></label></div><button class="admin-action" :disabled="saving">Recalculer les articles</button></form><div class="admin-table"><article v-for="item in detail.order.items"><strong>{{ item.product_name_snapshot }}</strong><span>× {{ item.quantity }}</span><span>{{ money(item.line_total_millimes) }}</span></article></div></section><div class="admin-actions"><button v-for="status in detail.allowed_transitions" class="admin-action" :disabled="saving" @click="transition(status)">{{ status }}</button></div><section class="admin-order-section"><h2>Livraison</h2><form v-if="detail.is_editable" class="admin-form" @submit.prevent="saveCustomer"><label>Nom complet<input v-model.trim="customer.full_name" required></label><label>Téléphone<input v-model.trim="customer.phone" required></label><label>Ville<input v-model.trim="customer.city" required></label><label>Adresse<textarea v-model="customer.address" required></textarea></label><button class="admin-action" :disabled="saving">Mettre à jour</button></form></section><section class="admin-order-section"><h2>Notes internes</h2><form class="admin-form" @submit.prevent="addNote"><label>Note<textarea v-model="note" required></textarea></label><button class="admin-action" :disabled="saving">Ajouter la note</button></form></section></template></section>`,
 };
-
 export default OrderDetailView;
