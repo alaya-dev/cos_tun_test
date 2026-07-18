@@ -1,32 +1,252 @@
 import { computed, onMounted, ref, type Component } from 'vue';
+import { showError, showToast } from './feedback';
 
-type Product = { public_id: string; name: string; has_variants: boolean; stock_quantity: number | null; low_stock_threshold?: number | null; category?: { name: string } };
-type Variant = { public_id: string; sku: string | null; stock_quantity: number; low_stock_threshold?: number | null; is_active: boolean; values?: { value: string }[] };
+type Product = {
+    public_id: string;
+    name: string;
+    has_variants: boolean;
+    stock_quantity: number | null;
+    low_stock_threshold?: number | null;
+    category?: { name: string };
+};
+type Variant = {
+    public_id: string;
+    sku: string | null;
+    stock_quantity: number;
+    low_stock_threshold?: number | null;
+    is_active: boolean;
+    values?: { value: string }[];
+};
 type Detail = Product & { variants: Variant[] };
-type Movement = { public_id: string; type: string; quantity_delta: number; quantity_before: number; quantity_after: number; reason: string; created_at?: string; product?: { name: string }; variant?: { sku: string | null; values?: { value: string }[] } };
+type Movement = {
+    public_id: string;
+    type: string;
+    quantity_delta: number;
+    quantity_before: number;
+    quantity_after: number;
+    reason: string;
+    created_at?: string;
+    product?: { name: string };
+    variant?: { sku: string | null; values?: { value: string }[] };
+};
 type Page<T> = { data: T[] };
-const csrf = () => document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '';
-const labelForMovement = (type: string) => ({ manual_adjustment: 'Ajustement manuel', order_reserved: 'Réservation commande', order_released: 'Réintégration commande', return_restock: 'Retour en stock' }[type] || type);
-async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> { const response = await fetch(`/api/v1/admin/${path}`, { method, credentials: 'same-origin', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf() }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }); if (!response.ok) { const payload = await response.json().catch(() => null) as { message?: string } | null; throw new Error(payload?.message || 'Opération impossible.'); } return response.json() as Promise<T>; }
+const csrf = () =>
+    document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+        ?.content || '';
+const labelForMovement = (type: string) =>
+    ({
+        manual_adjustment: 'Ajustement manuel',
+        order_reserved: 'Réservation commande',
+        order_released: 'Réintégration commande',
+        return_restock: 'Retour en stock',
+    })[type] || type;
+async function api<T>(
+    path: string,
+    method = 'GET',
+    body?: unknown,
+): Promise<T> {
+    const response = await fetch(`/api/v1/admin/${path}`, {
+        method,
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            ...(body === undefined
+                ? {}
+                : {
+                      'Content-Type': 'application/json',
+                      'X-CSRF-TOKEN': csrf(),
+                  }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+            message?: string;
+        } | null;
+        throw new Error(payload?.message || 'Opération impossible.');
+    }
+    return response.json() as Promise<T>;
+}
 
 const InventoryView: Component = {
     setup() {
-        const tab = ref<'inventory' | 'history'>('inventory'); const products = ref<Product[]>([]); const movements = ref<Movement[]>([]); const loading = ref(true); const error = ref(''); const notice = ref('');
-        const search = ref(''); const state = ref(''); const drawerProduct = ref<Product | null>(null); const variants = ref<Variant[]>([]); const saving = ref(false);
-        const adjustment = ref({ variant_public_id: '', direction: 'add', quantity: 1, reason: 'Réception fournisseur' });
-        const filteredProducts = computed(() => products.value.filter(product => { const text = `${product.name} ${product.category?.name || ''}`.toLowerCase(); if (search.value && !text.includes(search.value.toLowerCase())) return false; const stock = product.stock_quantity || 0; if (state.value === 'low' && (!product.low_stock_threshold || stock > product.low_stock_threshold || stock === 0)) return false; if (state.value === 'out' && stock !== 0) return false; if (state.value === 'variants' && !product.has_variants) return false; return true; }));
-        const load = async () => { loading.value = true; error.value = ''; try { const [productResponse, movementResponse] = await Promise.all([api<{ data: Page<Product> }>('products?per_page=100'), api<{ data: Page<Movement> }>('inventory/movements?per_page=50')]); products.value = productResponse.data.data; movements.value = movementResponse.data.data; } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Erreur de chargement.'; } finally { loading.value = false; } };
-        const openDrawer = async (product: Product) => { drawerProduct.value = product; variants.value = []; adjustment.value = { variant_public_id: '', direction: 'add', quantity: 1, reason: 'Réception fournisseur' }; if (product.has_variants) { try { variants.value = (await api<{ data: Detail }>(`products/${product.public_id}`)).data.variants.filter(variant => variant.is_active); } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Impossible de charger les variantes.'; } } };
-        const activeVariant = computed(() => variants.value.find(variant => variant.public_id === adjustment.value.variant_public_id));
-        const currentStock = computed(() => activeVariant.value?.stock_quantity ?? drawerProduct.value?.stock_quantity ?? 0);
-        const nextStock = computed(() => Math.max(0, currentStock.value + (adjustment.value.direction === 'add' ? adjustment.value.quantity : -adjustment.value.quantity)));
-        const submit = async () => { if (!drawerProduct.value) return; if (drawerProduct.value.has_variants && !adjustment.value.variant_public_id) { error.value = 'Sélectionnez une variante active.'; return; } if (adjustment.value.direction === 'remove' && adjustment.value.quantity > currentStock.value) { error.value = 'La quantité à retirer dépasse le stock disponible.'; return; } saving.value = true; error.value = ''; try { await api(`products/${drawerProduct.value.public_id}/inventory-adjustments`, 'POST', { variant_public_id: adjustment.value.variant_public_id || null, quantity_delta: adjustment.value.direction === 'add' ? adjustment.value.quantity : -adjustment.value.quantity, reason: adjustment.value.reason }); notice.value = 'Stock ajusté avec succès.'; drawerProduct.value = null; await load(); } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Ajustement impossible.'; } finally { saving.value = false; } };
-        const stockLabel = (product: Product) => product.has_variants ? 'Variantes' : `${product.stock_quantity || 0} unités`;
-        const stockState = (product: Product) => product.has_variants ? 'Géré par variante' : (product.stock_quantity === 0 ? 'Rupture' : (product.low_stock_threshold && (product.stock_quantity || 0) <= product.low_stock_threshold ? 'Stock faible' : 'En stock'));
+        const tab = ref<'inventory' | 'history'>('inventory');
+        const products = ref<Product[]>([]);
+        const movements = ref<Movement[]>([]);
+        const loading = ref(true);
+        const error = ref('');
+        const notice = ref('');
+        const search = ref('');
+        const state = ref('');
+        const drawerProduct = ref<Product | null>(null);
+        const variants = ref<Variant[]>([]);
+        const saving = ref(false);
+        const adjustment = ref({
+            variant_public_id: '',
+            direction: 'add',
+            quantity: 1,
+            reason: 'Réception fournisseur',
+        });
+        const filteredProducts = computed(() =>
+            products.value.filter((product) => {
+                const text =
+                    `${product.name} ${product.category?.name || ''}`.toLowerCase();
+                if (search.value && !text.includes(search.value.toLowerCase()))
+                    return false;
+                const stock = product.stock_quantity || 0;
+                if (
+                    state.value === 'low' &&
+                    (!product.low_stock_threshold ||
+                        stock > product.low_stock_threshold ||
+                        stock === 0)
+                )
+                    return false;
+                if (state.value === 'out' && stock !== 0) return false;
+                if (state.value === 'variants' && !product.has_variants)
+                    return false;
+                return true;
+            }),
+        );
+        const load = async () => {
+            loading.value = true;
+            try {
+                const [productResponse, movementResponse] = await Promise.all([
+                    api<{ data: Page<Product> }>('products?per_page=100'),
+                    api<{ data: Page<Movement> }>(
+                        'inventory/movements?per_page=50',
+                    ),
+                ]);
+                products.value = productResponse.data.data;
+                movements.value = movementResponse.data.data;
+            } catch (cause) {
+                showError(cause instanceof Error ? cause.message : 'Erreur de chargement.');
+            } finally {
+                loading.value = false;
+            }
+        };
+        const openDrawer = async (product: Product) => {
+            drawerProduct.value = product;
+            variants.value = [];
+            adjustment.value = {
+                variant_public_id: '',
+                direction: 'add',
+                quantity: 1,
+                reason: 'Réception fournisseur',
+            };
+            if (product.has_variants) {
+                try {
+                    variants.value = (
+                        await api<{ data: Detail }>(
+                            `products/${product.public_id}`,
+                        )
+                    ).data.variants.filter((variant) => variant.is_active);
+                } catch (cause) {
+                    showError(cause instanceof Error ? cause.message : 'Impossible de charger les variantes.');
+                }
+            }
+        };
+        const activeVariant = computed(() =>
+            variants.value.find(
+                (variant) =>
+                    variant.public_id === adjustment.value.variant_public_id,
+            ),
+        );
+        const currentStock = computed(
+            () =>
+                activeVariant.value?.stock_quantity ??
+                drawerProduct.value?.stock_quantity ??
+                0,
+        );
+        const nextStock = computed(() =>
+            Math.max(
+                0,
+                currentStock.value +
+                    (adjustment.value.direction === 'add'
+                        ? adjustment.value.quantity
+                        : -adjustment.value.quantity),
+            ),
+        );
+        const submit = async () => {
+            if (!drawerProduct.value) return;
+            if (
+                drawerProduct.value.has_variants &&
+                !adjustment.value.variant_public_id
+            ) {
+                showError('Sélectionnez une variante active.');
+                return;
+            }
+            if (
+                adjustment.value.direction === 'remove' &&
+                adjustment.value.quantity > currentStock.value
+            ) {
+                showError('La quantité à retirer dépasse le stock disponible.');
+                return;
+            }
+            saving.value = true;
+            try {
+                await api(
+                    `products/${drawerProduct.value.public_id}/inventory-adjustments`,
+                    'POST',
+                    {
+                        variant_public_id:
+                            adjustment.value.variant_public_id || null,
+                        quantity_delta:
+                            adjustment.value.direction === 'add'
+                                ? adjustment.value.quantity
+                                : -adjustment.value.quantity,
+                        reason: adjustment.value.reason,
+                    },
+                );
+                showToast('success', 'Stock ajusté avec succès.');
+                drawerProduct.value = null;
+                await load();
+            } catch (cause) {
+                showError(cause instanceof Error ? cause.message : 'Ajustement impossible.');
+            } finally {
+                saving.value = false;
+            }
+        };
+        const stockLabel = (product: Product) =>
+            product.has_variants
+                ? 'Variantes'
+                : `${product.stock_quantity || 0} unités`;
+        const stockState = (product: Product) =>
+            product.has_variants
+                ? 'Géré par variante'
+                : product.stock_quantity === 0
+                  ? 'Rupture'
+                  : product.low_stock_threshold &&
+                      (product.stock_quantity || 0) <=
+                          product.low_stock_threshold
+                    ? 'Stock faible'
+                    : 'En stock';
         onMounted(load);
-        return { tab, products, movements, loading, error, notice, search, state, drawerProduct, variants, adjustment, saving, filteredProducts, activeVariant, currentStock, nextStock, openDrawer, submit, labelForMovement, stockLabel, stockState };
+        return {
+            tab,
+            products,
+            movements,
+            loading,
+            error,
+            notice,
+            search,
+            state,
+            drawerProduct,
+            variants,
+            adjustment,
+            saving,
+            filteredProducts,
+            activeVariant,
+            currentStock,
+            nextStock,
+            openDrawer,
+            submit,
+            labelForMovement,
+            stockLabel,
+            stockState,
+        };
     },
-    template: '<section class="admin-page"><header><div><p class="admin-eyebrow">Traçabilité</p><h1>Inventaire</h1><p class="admin-subtitle">Suivez les niveaux de stock et chaque mouvement validé.</p></div></header><p v-if="error" class="admin-alert" role="alert">{{ error }}</p><p v-if="notice" class="admin-notice" role="status">{{ notice }}</p><nav class="admin-tabs" aria-label="Vues d’inventaire"><button :class="{ active: tab === \'inventory\' }" @click="tab = \'inventory\'">Inventaire</button><button :class="{ active: tab === \'history\' }" @click="tab = \'history\'">Historique des mouvements</button></nav><template v-if="tab === \'inventory\'"><div class="admin-filter-bar"><label class="admin-search"><span class="sr-only">Rechercher un produit</span><input v-model.trim="search" placeholder="Rechercher un produit ou une catégorie…"></label><select v-model="state"><option value="">Tous les états</option><option value="low">Stock faible</option><option value="out">Rupture</option><option value="variants">Avec variantes</option></select></div><p v-if="loading" class="admin-loading">Chargement de l’inventaire…</p><p v-else-if="!filteredProducts.length" class="admin-empty">Aucun produit ne correspond à ces critères.</p><div v-else class="admin-table inventory-table"><div class="admin-table-head"><span>Produit</span><span>Stock</span><span>Seuil</span><span>État</span><span>Action</span></div><article v-for="product in filteredProducts" :key="product.public_id"><div><strong>{{ product.name }}</strong><small>{{ product.category?.name || \'Sans catégorie\' }} · {{ product.has_variants ? \'Variantes\' : \'Stock unique\' }}</small></div><span>{{ stockLabel(product) }}</span><span>{{ product.has_variants ? \'—\' : (product.low_stock_threshold || \'Sans seuil\') }}</span><span :class="product.stock_quantity === 0 && !product.has_variants ? \'admin-badge warning\' : \'admin-badge\'">{{ stockState(product) }}</span><span><button class="text-link" type="button" @click="openDrawer(product)">Ajuster</button></span></article></div></template><template v-else><p v-if="loading" class="admin-loading">Chargement de l’historique…</p><p v-else-if="!movements.length" class="admin-empty">Aucun mouvement de stock n’a encore été enregistré.</p><div v-else class="admin-table inventory-table"><div class="admin-table-head"><span>Produit</span><span>Mouvement</span><span>Avant → Après</span><span>Motif</span><span>Date</span></div><article v-for="movement in movements" :key="movement.public_id"><div><strong>{{ movement.product?.name || \'Produit archivé\' }}</strong><small v-if="movement.variant">{{ movement.variant.sku || \'Variante\' }}</small></div><span :class="movement.quantity_delta > 0 ? \'status-active\' : \'danger\'">{{ movement.quantity_delta > 0 ? \'+\' : \'\' }}{{ movement.quantity_delta }} · {{ labelForMovement(movement.type) }}</span><span>{{ movement.quantity_before }} → {{ movement.quantity_after }}</span><span>{{ movement.reason }}</span><span>{{ movement.created_at ? new Date(movement.created_at).toLocaleDateString(\'fr-TN\') : \'—\' }}</span></article></div></template><aside v-if="drawerProduct" class="admin-drawer" role="dialog" aria-modal="true" aria-labelledby="adjustment-title"><div class="admin-drawer-backdrop" @click="drawerProduct = null"></div><section><header><div><p class="admin-eyebrow">Inventaire</p><h2 id="adjustment-title">Ajuster le stock</h2></div><button class="text-link" type="button" @click="drawerProduct = null">Fermer</button></header><p><strong>{{ drawerProduct.name }}</strong><br><small>{{ drawerProduct.category?.name || \'Sans catégorie\' }}</small></p><label v-if="variants.length">Variante<select v-model="adjustment.variant_public_id"><option value="">Choisir une variante</option><option v-for="variant in variants" :key="variant.public_id" :value="variant.public_id">{{ variant.sku || variant.values?.map(value => value.value).join(\' / \') || \'Variante\' }} · {{ variant.stock_quantity }}</option></select></label><p class="stock-readout">Stock actuel <strong>{{ currentStock }}</strong></p><fieldset><legend>Type d’ajustement</legend><label><input v-model="adjustment.direction" type="radio" value="add"> Ajouter</label><label><input v-model="adjustment.direction" type="radio" value="remove"> Retirer</label></fieldset><label>Quantité <b aria-hidden="true">*</b><input v-model.number="adjustment.quantity" type="number" min="1" required></label><p class="stock-readout">Nouveau stock <strong>{{ currentStock }} → {{ nextStock }}</strong></p><label>Motif <b aria-hidden="true">*</b><select v-model="adjustment.reason"><option>Réception fournisseur</option><option>Correction inventaire</option><option>Produit endommagé</option><option>Autre</option></select></label><footer><button class="text-link" type="button" @click="drawerProduct = null">Annuler</button><button class="admin-action" type="button" :disabled="saving" @click="submit">{{ saving ? \'Validation…\' : \'Confirmer l’ajustement\' }}</button></footer></section></aside></section>',
+    template:
+        '<section class="admin-page"><header><div><p class="admin-eyebrow">Traçabilité</p><h1>Inventaire</h1><p class="admin-subtitle">Suivez les niveaux de stock et chaque mouvement validé.</p></div></header><p v-if="error" class="admin-alert" role="alert">{{ error }}</p><p v-if="notice" class="admin-notice" role="status">{{ notice }}</p><nav class="admin-tabs" aria-label="Vues d’inventaire"><button :class="{ active: tab === \'inventory\' }" @click="tab = \'inventory\'">Inventaire</button><button :class="{ active: tab === \'history\' }" @click="tab = \'history\'">Historique des mouvements</button></nav><template v-if="tab === \'inventory\'"><div class="admin-filter-bar"><label class="admin-search"><span class="sr-only">Rechercher un produit</span><input v-model.trim="search" placeholder="Rechercher un produit ou une catégorie…"></label><select v-model="state"><option value="">Tous les états</option><option value="low">Stock faible</option><option value="out">Rupture</option><option value="variants">Avec variantes</option></select></div><p v-if="loading" class="admin-loading">Chargement de l’inventaire…</p><p v-else-if="!filteredProducts.length" class="admin-empty">Aucun produit ne correspond à ces critères.</p><div v-else class="admin-table inventory-table"><div class="admin-table-head"><span>Produit</span><span>Stock</span><span>Seuil</span><span>État</span><span>Action</span></div><article v-for="product in filteredProducts" :key="product.public_id"><div><strong>{{ product.name }}</strong><small>{{ product.category?.name || \'Sans catégorie\' }} · {{ product.has_variants ? \'Variantes\' : \'Stock unique\' }}</small></div><span>{{ stockLabel(product) }}</span><span>{{ product.has_variants ? \'—\' : (product.low_stock_threshold || \'Sans seuil\') }}</span><span :class="product.stock_quantity === 0 && !product.has_variants ? \'admin-badge warning\' : \'admin-badge\'">{{ stockState(product) }}</span><span><button class="text-link" type="button" @click="openDrawer(product)">Ajuster</button></span></article></div></template><template v-else><p v-if="loading" class="admin-loading">Chargement de l’historique…</p><p v-else-if="!movements.length" class="admin-empty">Aucun mouvement de stock n’a encore été enregistré.</p><div v-else class="admin-table inventory-table"><div class="admin-table-head"><span>Produit</span><span>Mouvement</span><span>Avant → Après</span><span>Motif</span><span>Date</span></div><article v-for="movement in movements" :key="movement.public_id"><div><strong>{{ movement.product?.name || \'Produit archivé\' }}</strong><small v-if="movement.variant">{{ movement.variant.sku || \'Variante\' }}</small></div><span :class="movement.quantity_delta > 0 ? \'status-active\' : \'danger\'">{{ movement.quantity_delta > 0 ? \'+\' : \'\' }}{{ movement.quantity_delta }} · {{ labelForMovement(movement.type) }}</span><span>{{ movement.quantity_before }} → {{ movement.quantity_after }}</span><span>{{ movement.reason }}</span><span>{{ movement.created_at ? new Date(movement.created_at).toLocaleDateString(\'fr-TN\') : \'—\' }}</span></article></div></template><aside v-if="drawerProduct" class="admin-drawer" role="dialog" aria-modal="true" aria-labelledby="adjustment-title"><div class="admin-drawer-backdrop" @click="drawerProduct = null"></div><section><header><div><p class="admin-eyebrow">Inventaire</p><h2 id="adjustment-title">Ajuster le stock</h2></div><button class="text-link" type="button" @click="drawerProduct = null">Fermer</button></header><p><strong>{{ drawerProduct.name }}</strong><br><small>{{ drawerProduct.category?.name || \'Sans catégorie\' }}</small></p><label v-if="variants.length">Variante<select v-model="adjustment.variant_public_id"><option value="">Choisir une variante</option><option v-for="variant in variants" :key="variant.public_id" :value="variant.public_id">{{ variant.sku || variant.values?.map(value => value.value).join(\' / \') || \'Variante\' }} · {{ variant.stock_quantity }}</option></select></label><p class="stock-readout">Stock actuel <strong>{{ currentStock }}</strong></p><fieldset><legend>Type d’ajustement</legend><label><input v-model="adjustment.direction" type="radio" value="add"> Ajouter</label><label><input v-model="adjustment.direction" type="radio" value="remove"> Retirer</label></fieldset><label>Quantité <b aria-hidden="true">*</b><input v-model.number="adjustment.quantity" type="number" min="1" required></label><p class="stock-readout">Nouveau stock <strong>{{ currentStock }} → {{ nextStock }}</strong></p><label>Motif <b aria-hidden="true">*</b><select v-model="adjustment.reason"><option>Réception fournisseur</option><option>Correction inventaire</option><option>Produit endommagé</option><option>Autre</option></select></label><footer><button class="text-link" type="button" @click="drawerProduct = null">Annuler</button><button class="admin-action" type="button" :disabled="saving" @click="submit">{{ saving ? \'Validation…\' : \'Confirmer l’ajustement\' }}</button></footer></section></aside></section>',
 };
 
 export default InventoryView;

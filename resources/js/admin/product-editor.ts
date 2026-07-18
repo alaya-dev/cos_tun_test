@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, type Component } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { confirmAction, showError, showToast } from './feedback';
 
 type Category = { public_id: string; name: string };
 type Value = { id: number; value: string };
@@ -222,10 +223,7 @@ const ProductEditorView: Component = {
                 categories.value = categoryResult.data.data;
                 if (detail) hydrate(detail.data);
             } catch (cause) {
-                error.value =
-                    cause instanceof Error
-                        ? cause.message
-                        : 'Chargement impossible.';
+                showError(cause instanceof Error ? cause.message : 'Chargement impossible.');
             } finally {
                 loading.value = false;
             }
@@ -278,15 +276,10 @@ const ProductEditorView: Component = {
                 );
                 await refresh();
                 if (enable && !groups.value.length) addGroup();
-                notice.value = enable
-                    ? 'Variantes activées. Ajoutez les options ci-dessous.'
-                    : 'Stock unique activé.';
+                showToast('success', enable ? 'Variantes activées. Ajoutez les options ci-dessous.' : 'Stock unique activé.');
             } catch (cause) {
                 variantMode.value = !enable;
-                error.value =
-                    cause instanceof Error
-                        ? cause.message
-                        : 'Changement impossible.';
+                showError(cause instanceof Error ? cause.message : 'Changement impossible.');
             } finally {
                 saving.value = false;
             }
@@ -363,28 +356,36 @@ const ProductEditorView: Component = {
         const updateMedia = async (image: Media) => {
             if (!product.value) return;
             if (image.role === 'variant' && !image.variant_public_id) return;
-            await api(
-                `products/${product.value.public_id}/images/${image.public_id}`,
-                'PATCH',
-                {
-                    alt_text: image.alt_text,
-                    is_primary: image.role === 'primary',
-                    variant_public_id:
-                        image.role === 'variant'
-                            ? image.variant_public_id
-                            : null,
-                },
-            );
-            await refresh();
+            try {
+                await api(
+                    `products/${product.value.public_id}/images/${image.public_id}`,
+                    'PATCH',
+                    {
+                        alt_text: image.alt_text,
+                        is_primary: image.role === 'primary',
+                        variant_public_id:
+                            image.role === 'variant'
+                                ? image.variant_public_id
+                                : null,
+                    },
+                );
+                await refresh();
+                showToast('success', 'Image mise à jour.');
+            } catch (cause) {
+                showError(cause instanceof Error ? cause.message : 'Mise à jour de l’image impossible.');
+            }
         };
         const removeMedia = async (image: Media) => {
-            if (!product.value || !window.confirm('Retirer cette image ?'))
-                return;
-            await api(
-                `products/${product.value.public_id}/images/${image.public_id}`,
-                'DELETE',
-            );
-            await refresh();
+            if (!product.value) return;
+            const confirmed = await confirmAction('Retirer cette image ?', 'L’image ne sera plus visible dans la galerie du produit.', 'Retirer', 'danger');
+            if (!confirmed) return;
+            try {
+                await api(`products/${product.value.public_id}/images/${image.public_id}`, 'DELETE');
+                await refresh();
+                showToast('success', 'Image retirée.');
+            } catch (cause) {
+                showError(cause instanceof Error ? cause.message : 'Suppression de l’image impossible.');
+            }
         };
         const validationError = () => {
             if (
@@ -392,20 +393,24 @@ const ProductEditorView: Component = {
                 !form.value.name.trim() ||
                 !form.value.slug.trim() ||
                 !form.value.regular_price_dt
-            ) return 'Complétez les champs obligatoires.';
+            )
+                return 'Complétez les champs obligatoires.';
             if (
                 variantMode.value &&
                 (!groups.value.length ||
                     groups.value.some((group) => !group.name.trim()) ||
                     !variants.value.length)
-            ) return 'Ajoutez les options puis générez les variantes.';
+            )
+                return 'Ajoutez les options puis générez les variantes.';
             if (
                 queued.value.some(
                     (media) =>
                         media.role === 'variant' && media.variantIndex === '',
                 )
-            ) return 'Choisissez une variante pour chaque image de variante.';
-            if (!isNew.value && !product.value) return 'Rechargez le produit avant de l’enregistrer.';
+            )
+                return 'Choisissez une variante pour chaque image de variante.';
+            if (!isNew.value && !product.value)
+                return 'Rechargez le produit avant de l’enregistrer.';
             return '';
         };
         const productFields = () => ({
@@ -465,7 +470,11 @@ const ProductEditorView: Component = {
         const save = async () => {
             error.value = validationError();
             notice.value = '';
-            if (error.value) return;
+            if (error.value) {
+                showError(error.value);
+                error.value = '';
+                return;
+            }
             saving.value = true;
             try {
                 const savedProduct = isNew.value
@@ -473,12 +482,16 @@ const ProductEditorView: Component = {
                     : await updateProduct();
                 await uploadQueued(savedProduct);
                 await refresh(savedProduct.public_id);
-                notice.value = 'Produit enregistré.';
+                showToast(
+                    product.value?.images.some((image) => image.is_primary)
+                        ? 'success'
+                        : 'warning',
+                    product.value?.images.some((image) => image.is_primary)
+                        ? 'Produit enregistré.'
+                        : 'Produit enregistré. Ajoutez une image principale pour éviter l’image de remplacement.',
+                );
             } catch (cause) {
-                error.value =
-                    cause instanceof Error
-                        ? cause.message
-                        : 'Enregistrement impossible.';
+                showError(cause instanceof Error ? cause.message : 'Enregistrement impossible.');
             } finally {
                 saving.value = false;
             }

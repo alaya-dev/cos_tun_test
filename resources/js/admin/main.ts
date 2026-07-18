@@ -17,6 +17,7 @@ import {
     dismissToast,
     feedbackState,
     resolveConfirmation,
+    showError,
 } from './feedback';
 
 const Shell = {
@@ -27,15 +28,20 @@ const Shell = {
                 document.querySelector<HTMLMetaElement>(
                     'meta[name="csrf-token"]',
                 )?.content || '';
-            await fetch('/admin/logout', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    'X-CSRF-TOKEN': csrfToken,
-                    Accept: 'application/json',
-                },
-            });
-            window.location.assign('/admin/login');
+            try {
+                const response = await fetch('/admin/logout', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        Accept: 'application/json',
+                    },
+                });
+                if (!response.ok) throw new Error('Déconnexion impossible. Réessayez dans un instant.');
+                window.location.assign('/admin/login');
+            } catch (cause) {
+                showError(cause instanceof Error ? cause.message : 'Déconnexion impossible.');
+            }
         };
 
         return {
@@ -60,7 +66,7 @@ const Shell = {
       <main><div class="admin-topbar"><span>Passion Cosmetic</span><small>Back-office sécurisé</small></div><RouterView v-slot="{ Component }"><Transition name="admin-page" mode="out-in"><component :is="Component" /></Transition></RouterView></main>
       <TransitionGroup name="admin-toast" tag="aside" class="admin-toast-stack" aria-live="polite" aria-relevant="additions">
         <article v-for="toast in toasts" :key="toast.id" class="admin-toast" :class="'is-' + toast.tone" role="status">
-          <span class="admin-toast-mark" aria-hidden="true">{{ toast.tone === 'success' ? '✓' : toast.tone === 'warning' ? '!' : 'i' }}</span>
+          <span class="admin-toast-mark" aria-hidden="true">{{ toast.tone === 'success' ? '✓' : toast.tone === 'info' ? 'i' : '!' }}</span>
           <p>{{ toast.message }}</p>
           <button type="button" :aria-label="'Fermer la notification'" @click="dismissToast(toast.id)">×</button>
         </article>
@@ -69,14 +75,14 @@ const Shell = {
         <section class="admin-feedback-dialog" role="alertdialog" aria-modal="true" aria-labelledby="admin-error-title" aria-describedby="admin-error-message">
           <span class="admin-dialog-mark is-error" aria-hidden="true">!</span>
           <div><p class="admin-eyebrow">Action requise</p><h2 id="admin-error-title">{{ errorDialog.title }}</h2><p id="admin-error-message">{{ errorDialog.message }}</p></div>
-          <footer><button class="admin-action" type="button" @click="dismissError">Compris</button></footer>
+          <footer><button class="admin-action" type="button" autofocus @click="dismissError">Compris</button></footer>
         </section>
       </div></Transition>
       <Transition name="admin-overlay"><div v-if="confirmationDialog" class="admin-overlay" role="presentation" @click.self="resolveConfirmation(false)">
         <section class="admin-feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-confirmation-title" aria-describedby="admin-confirmation-message">
           <span class="admin-dialog-mark" :class="confirmationDialog.tone === 'danger' ? 'is-error' : 'is-warning'" aria-hidden="true">!</span>
           <div><p class="admin-eyebrow">Confirmation</p><h2 id="admin-confirmation-title">{{ confirmationDialog.title }}</h2><p id="admin-confirmation-message">{{ confirmationDialog.message }}</p></div>
-          <footer><button class="text-link" type="button" @click="resolveConfirmation(false)">Annuler</button><button class="admin-action" :class="{ 'danger-button': confirmationDialog.tone === 'danger' }" type="button" @click="resolveConfirmation(true)">{{ confirmationDialog.confirmLabel }}</button></footer>
+          <footer><button class="text-link" type="button" autofocus @click="resolveConfirmation(false)">Annuler</button><button class="admin-action" :class="{ 'danger-button': confirmationDialog.tone === 'danger' }" type="button" @click="resolveConfirmation(true)">{{ confirmationDialog.confirmLabel }}</button></footer>
         </section>
       </div></Transition>
     </div>`,

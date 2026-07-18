@@ -1,6 +1,6 @@
 import { ref } from 'vue';
 
-export type ToastTone = 'success' | 'warning' | 'info';
+export type ToastTone = 'success' | 'error' | 'warning' | 'info';
 
 type Toast = {
     id: number;
@@ -29,7 +29,7 @@ let nextToastId = 1;
 export const showToast = (tone: ToastTone, message: string) => {
     const toast = { id: nextToastId++, tone, message };
     toasts.value = [...toasts.value, toast].slice(-3);
-    window.setTimeout(() => dismissToast(toast.id), tone === 'warning' ? 7500 : 4500);
+    globalThis.setTimeout(() => dismissToast(toast.id), tone === 'error' || tone === 'warning' ? 7500 : 4500);
 };
 
 export const dismissToast = (toastId: number) => {

@@ -1,10 +1,131 @@
 import { onMounted, ref, type Component } from 'vue';
 import { RouterLink } from 'vue-router';
-type Order = { public_reference: string; customer_name: string; customer_phone: string; status: string; total_millimes: number; created_at: string; items_count: number };
-type Page<T> = { data: T[]; current_page: number; last_page: number; total: number };
-const money = (value: number) => `${(value / 1000).toFixed(3).replace('.', ',')} DT`;
-const label = (value: string) => ({ nouvelle: 'Nouvelle', confirmee: 'Confirmée', annulee: 'Annulée', livree: 'Livrée', echec_livraison: 'Incident de livraison', retournee: 'Retournée' }[value] || value);
-const toMillimes = (value: string) => value ? Math.round(Number(value.replace(',', '.')) * 1000) : null;
-async function api<T>(path: string): Promise<T> { const response = await fetch(`/api/v1/admin/${path}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' }); if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? 'Votre session ne permet pas cet accès.' : 'Impossible de charger les commandes. Réessayez dans un instant.'); return response.json() as Promise<T>; }
-const OrdersView: Component = { components: { RouterLink }, setup() { const page = ref<Page<Order> | null>(null); const loading = ref(true); const error = ref(''); const extra = ref(false); const filters = ref({ search: '', status: '', date_from: '', date_to: '', min_total_dt: '', max_total_dt: '', sort: '-created_at' }); const load = async (requestedPage = 1) => { loading.value = true; error.value = ''; try { const query = new URLSearchParams({ per_page: '25', page: String(requestedPage), sort: filters.value.sort }); if (filters.value.search) query.set('search', filters.value.search); if (filters.value.status) query.set('status', filters.value.status); if (filters.value.date_from) query.set('date_from', filters.value.date_from); if (filters.value.date_to) query.set('date_to', filters.value.date_to); const min = toMillimes(filters.value.min_total_dt); const max = toMillimes(filters.value.max_total_dt); if (min !== null) query.set('min_total_millimes', String(min)); if (max !== null) query.set('max_total_millimes', String(max)); page.value = (await api<{ data: Page<Order> }>(`orders?${query}`)).data; } catch (cause) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { loading.value = false; } }; let timer: number | undefined; const search = () => { window.clearTimeout(timer); timer = window.setTimeout(load, 280); }; const reset = () => { filters.value = { search: '', status: '', date_from: '', date_to: '', min_total_dt: '', max_total_dt: '', sort: '-created_at' }; load(); }; const exportCsv = () => { const query = new URLSearchParams(); if (filters.value.status) query.set('status', filters.value.status); window.location.assign(`/api/v1/admin/orders/export?${query}`); }; onMounted(load); return { page, loading, error, extra, filters, load, search, reset, exportCsv, money, label }; }, template: '<section class="admin-page"><header><div><p class="admin-eyebrow">Opérations</p><h1>Commandes</h1><p class="admin-subtitle">Recherchez, filtrez et suivez les commandes sans perdre le contexte.</p></div><button class="admin-outline" :disabled="!page?.data.length" @click="exportCsv">Exporter CSV</button></header><div class="orders-toolbar"><label class="admin-search"><span class="sr-only">Rechercher une commande</span><input v-model.trim="filters.search" @input="search" placeholder="Référence, client ou téléphone…"></label><label class="toolbar-select"><span>Statut</span><select v-model="filters.status" @change="load()"><option value="">Toutes les commandes</option><option value="nouvelle">Nouvelles</option><option value="confirmee">Confirmées</option><option value="livree">Livrées</option><option value="echec_livraison">Incidents</option><option value="annulee">Annulées</option><option value="retournee">Retournées</option></select></label><label class="toolbar-select"><span>Trier</span><select v-model="filters.sort" @change="load()"><option value="-created_at">Plus récentes</option><option value="created_at">Plus anciennes</option><option value="-total_millimes">Total décroissant</option><option value="total_millimes">Total croissant</option></select></label><button class="text-link" type="button" @click="extra = !extra">{{ extra ? \'Moins de filtres\' : \'Plus de filtres\' }}</button><button class="text-link" type="button" @click="reset">Réinitialiser</button></div><div v-if="extra" class="orders-extra"><label>Du<input v-model="filters.date_from" type="date" @change="load()"></label><label>Au<input v-model="filters.date_to" type="date" @change="load()"></label><label>Total minimum (DT)<input v-model="filters.min_total_dt" inputmode="decimal" @change="load()"></label><label>Total maximum (DT)<input v-model="filters.max_total_dt" inputmode="decimal" @change="load()"></label></div><p v-if="loading" class="admin-loading">Chargement des commandes…</p><p v-else-if="error" class="admin-alert" role="alert">{{ error }}</p><p v-else-if="!page?.data.length" class="admin-empty">Aucune commande ne correspond à ces filtres. Modifiez-les ou réinitialisez la recherche.</p><template v-else><p class="admin-result-count">{{ page.total }} commande(s)</p><div class="admin-table orders-table"><div class="admin-table-head"><span>Référence / client</span><span>Date</span><span>Total</span><span>Statut</span></div><RouterLink v-for="order in page.data" :key="order.public_reference" :to="\'/orders/\' + order.public_reference"><article><div><strong>{{ order.public_reference }}</strong><small>{{ order.customer_name }} · {{ order.customer_phone }} · {{ order.items_count }} article(s)</small></div><span>{{ new Date(order.created_at).toLocaleDateString(\'fr-TN\') }}</span><span>{{ money(order.total_millimes) }}</span><span class="admin-badge">{{ label(order.status) }}</span></article></RouterLink></div></template></section>' };
+import { showError, showToast } from './feedback';
+type Order = {
+    public_reference: string;
+    customer_name: string;
+    customer_phone: string;
+    status: string;
+    total_millimes: number;
+    created_at: string;
+    items_count: number;
+};
+type Page<T> = {
+    data: T[];
+    current_page: number;
+    last_page: number;
+    total: number;
+};
+const money = (value: number) =>
+    `${(value / 1000).toFixed(3).replace('.', ',')} DT`;
+const label = (value: string) =>
+    ({
+        nouvelle: 'Nouvelle',
+        confirmee: 'Confirmée',
+        annulee: 'Annulée',
+        livree: 'Livrée',
+        echec_livraison: 'Incident de livraison',
+        retournee: 'Retournée',
+    })[value] || value;
+const toMillimes = (value: string) =>
+    value ? Math.round(Number(value.replace(',', '.')) * 1000) : null;
+async function api<T>(path: string): Promise<T> {
+    const response = await fetch(`/api/v1/admin/${path}`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+    });
+    if (!response.ok)
+        throw new Error(
+            response.status === 401 || response.status === 403
+                ? 'Votre session ne permet pas cet accès.'
+                : 'Impossible de charger les commandes. Réessayez dans un instant.',
+        );
+    return response.json() as Promise<T>;
+}
+const OrdersView: Component = {
+    components: { RouterLink },
+    setup() {
+        const page = ref<Page<Order> | null>(null);
+        const loading = ref(true);
+        const error = ref('');
+        const extra = ref(false);
+        const filters = ref({
+            search: '',
+            status: '',
+            date_from: '',
+            date_to: '',
+            min_total_dt: '',
+            max_total_dt: '',
+            sort: '-created_at',
+        });
+        const load = async (requestedPage = 1) => {
+            loading.value = true;
+            try {
+                const query = new URLSearchParams({
+                    per_page: '25',
+                    page: String(requestedPage),
+                    sort: filters.value.sort,
+                });
+                if (filters.value.search)
+                    query.set('search', filters.value.search);
+                if (filters.value.status)
+                    query.set('status', filters.value.status);
+                if (filters.value.date_from)
+                    query.set('date_from', filters.value.date_from);
+                if (filters.value.date_to)
+                    query.set('date_to', filters.value.date_to);
+                const min = toMillimes(filters.value.min_total_dt);
+                const max = toMillimes(filters.value.max_total_dt);
+                if (min !== null) query.set('min_total_millimes', String(min));
+                if (max !== null) query.set('max_total_millimes', String(max));
+                page.value = (
+                    await api<{ data: Page<Order> }>(`orders?${query}`)
+                ).data;
+            } catch (cause) {
+                showError(cause instanceof Error ? cause.message : 'Impossible de charger les commandes.');
+            } finally {
+                loading.value = false;
+            }
+        };
+        let timer: number | undefined;
+        const search = () => {
+            window.clearTimeout(timer);
+            timer = window.setTimeout(load, 280);
+        };
+        const reset = () => {
+            filters.value = {
+                search: '',
+                status: '',
+                date_from: '',
+                date_to: '',
+                min_total_dt: '',
+                max_total_dt: '',
+                sort: '-created_at',
+            };
+            load();
+            showToast('info', 'Filtres réinitialisés.');
+        };
+        const exportCsv = () => {
+            const query = new URLSearchParams();
+            if (filters.value.status) query.set('status', filters.value.status);
+            window.location.assign(`/api/v1/admin/orders/export?${query}`);
+        };
+        onMounted(load);
+        return {
+            page,
+            loading,
+            error,
+            extra,
+            filters,
+            load,
+            search,
+            reset,
+            exportCsv,
+            money,
+            label,
+        };
+    },
+    template:
+        '<section class="admin-page"><header><div><p class="admin-eyebrow">Opérations</p><h1>Commandes</h1><p class="admin-subtitle">Recherchez, filtrez et suivez les commandes sans perdre le contexte.</p></div><button class="admin-outline" :disabled="!page?.data.length" @click="exportCsv">Exporter CSV</button></header><div class="orders-toolbar"><label class="admin-search"><span class="sr-only">Rechercher une commande</span><input v-model.trim="filters.search" @input="search" placeholder="Référence, client ou téléphone…"></label><label class="toolbar-select"><span>Statut</span><select v-model="filters.status" @change="load()"><option value="">Toutes les commandes</option><option value="nouvelle">Nouvelles</option><option value="confirmee">Confirmées</option><option value="livree">Livrées</option><option value="echec_livraison">Incidents</option><option value="annulee">Annulées</option><option value="retournee">Retournées</option></select></label><label class="toolbar-select"><span>Trier</span><select v-model="filters.sort" @change="load()"><option value="-created_at">Plus récentes</option><option value="created_at">Plus anciennes</option><option value="-total_millimes">Total décroissant</option><option value="total_millimes">Total croissant</option></select></label><button class="text-link" type="button" @click="extra = !extra">{{ extra ? \'Moins de filtres\' : \'Plus de filtres\' }}</button><button class="text-link" type="button" @click="reset">Réinitialiser</button></div><div v-if="extra" class="orders-extra"><label>Du<input v-model="filters.date_from" type="date" @change="load()"></label><label>Au<input v-model="filters.date_to" type="date" @change="load()"></label><label>Total minimum (DT)<input v-model="filters.min_total_dt" inputmode="decimal" @change="load()"></label><label>Total maximum (DT)<input v-model="filters.max_total_dt" inputmode="decimal" @change="load()"></label></div><p v-if="loading" class="admin-loading">Chargement des commandes…</p><p v-else-if="error" class="admin-alert" role="alert">{{ error }}</p><p v-else-if="!page?.data.length" class="admin-empty">Aucune commande ne correspond à ces filtres. Modifiez-les ou réinitialisez la recherche.</p><template v-else><p class="admin-result-count">{{ page.total }} commande(s)</p><div class="admin-table orders-table"><div class="admin-table-head"><span>Référence / client</span><span>Date</span><span>Total</span><span>Statut</span></div><RouterLink v-for="order in page.data" :key="order.public_reference" :to="\'/orders/\' + order.public_reference"><article><div><strong>{{ order.public_reference }}</strong><small>{{ order.customer_name }} · {{ order.customer_phone }} · {{ order.items_count }} article(s)</small></div><span>{{ new Date(order.created_at).toLocaleDateString(\'fr-TN\') }}</span><span>{{ money(order.total_millimes) }}</span><span class="admin-badge">{{ label(order.status) }}</span></article></RouterLink></div></template></section>',
+};
 export default OrdersView;

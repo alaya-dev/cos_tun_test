@@ -1,23 +1,217 @@
 import { onMounted, ref, type Component } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
+import { confirmAction, showError, showToast } from './feedback';
 
-type Variant = { public_id: string; sku: string | null; is_active: boolean; values: { value: string }[] };
+type Variant = {
+    public_id: string;
+    sku: string | null;
+    is_active: boolean;
+    values: { value: string }[];
+};
 type Product = { public_id: string; variants: Variant[] };
-type Item = { product_name_snapshot: string; quantity: number; line_total_millimes: number; product: Product | null; variant: Variant | null };
-type Order = { public_reference: string; lock_version: number; customer_name: string; customer_phone: string; customer_city: string; customer_address: string; status: string; total_millimes: number; items: Item[]; notes: { body: string }[]; status_history: { from_status: string; to_status: string; reason: string | null }[] };
-type Detail = { order: Order; is_editable: boolean; allowed_transitions: string[]; meta_purchase: { status: string } };
-type Line = { product_public_id: string; variant_public_id: string | null; quantity: number; label: string; variants: Variant[] };
-const money = (value: number) => `${(value / 1000).toFixed(3).replace('.', ',')} DT`;
-async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> { const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || ''; const response = await fetch(`/api/v1/admin/${path}`, { method, credentials: 'same-origin', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }); if (!response.ok) { const data = await response.json().catch(() => null) as { message?: string } | null; throw new Error(data?.message || 'Opération impossible.'); } return response.json() as Promise<T>; }
+type Item = {
+    product_name_snapshot: string;
+    quantity: number;
+    line_total_millimes: number;
+    product: Product | null;
+    variant: Variant | null;
+};
+type Order = {
+    public_reference: string;
+    lock_version: number;
+    customer_name: string;
+    customer_phone: string;
+    customer_city: string;
+    customer_address: string;
+    status: string;
+    total_millimes: number;
+    items: Item[];
+    notes: { body: string }[];
+    status_history: {
+        from_status: string;
+        to_status: string;
+        reason: string | null;
+    }[];
+};
+type Detail = {
+    order: Order;
+    is_editable: boolean;
+    allowed_transitions: string[];
+    meta_purchase: { status: string };
+};
+type Line = {
+    product_public_id: string;
+    variant_public_id: string | null;
+    quantity: number;
+    label: string;
+    variants: Variant[];
+};
+const money = (value: number) =>
+    `${(value / 1000).toFixed(3).replace('.', ',')} DT`;
+async function api<T>(
+    path: string,
+    method = 'GET',
+    body?: unknown,
+): Promise<T> {
+    const token =
+        document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+            ?.content || '';
+    const response = await fetch(`/api/v1/admin/${path}`, {
+        method,
+        credentials: 'same-origin',
+        headers: {
+            Accept: 'application/json',
+            ...(body === undefined
+                ? {}
+                : {
+                      'Content-Type': 'application/json',
+                      'X-CSRF-TOKEN': token,
+                  }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as {
+            message?: string;
+        } | null;
+        throw new Error(data?.message || 'Opération impossible.');
+    }
+    return response.json() as Promise<T>;
+}
 
 const OrderDetailView: Component = {
     components: { RouterLink },
     setup() {
-        const route = useRoute(); const detail = ref<Detail | null>(null); const lines = ref<Line[]>([]); const customer = ref({ full_name: '', phone: '', city: '', address: '' }); const note = ref(''); const loading = ref(true); const saving = ref(false); const error = ref('');
-        const refresh = async () => { const next = (await api<{ data: Detail }>(`orders/${route.params.reference}`)).data; detail.value = next; customer.value = { full_name: next.order.customer_name, phone: next.order.customer_phone, city: next.order.customer_city, address: next.order.customer_address }; lines.value = next.order.items.flatMap(item => item.product ? [{ product_public_id: item.product.public_id, variant_public_id: item.variant?.public_id || null, quantity: item.quantity, label: item.product_name_snapshot, variants: item.product.variants.filter(variant => variant.is_active) }] : []); };
-        onMounted(async () => { try { await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { loading.value = false; } });
-        const run = async (path: string, method: string, body: unknown) => { saving.value = true; error.value = ''; try { await api(path, method, body); await refresh(); } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; } };
-        return { detail, lines, customer, note, loading, saving, error, money, print: () => window.print(), saveCustomer: () => detail.value && run(`orders/${detail.value.order.public_reference}`, 'PATCH', { lock_version: detail.value.order.lock_version, customer: customer.value }), saveItems: () => detail.value && run(`orders/${detail.value.order.public_reference}/items`, 'PUT', { lock_version: detail.value.order.lock_version, items: lines.value.map(({ product_public_id, variant_public_id, quantity }) => ({ product_public_id, variant_public_id, quantity })) }), transition: (status: string) => detail.value && run(`orders/${detail.value.order.public_reference}/transitions`, 'POST', { to_status: status, lock_version: detail.value.order.lock_version, reason: ['annulee', 'echec_livraison', 'retournee'].includes(status) ? 'Décision opérateur' : null, restock_items: status === 'retournee' }), addNote: () => detail.value && note.value.trim() && run(`orders/${detail.value.order.public_reference}/notes`, 'POST', { body: note.value.trim() }) };
+        const route = useRoute();
+        const detail = ref<Detail | null>(null);
+        const lines = ref<Line[]>([]);
+        const customer = ref({
+            full_name: '',
+            phone: '',
+            city: '',
+            address: '',
+        });
+        const note = ref('');
+        const loading = ref(true);
+        const saving = ref(false);
+        const error = ref('');
+        const refresh = async () => {
+            const next = (
+                await api<{ data: Detail }>(`orders/${route.params.reference}`)
+            ).data;
+            detail.value = next;
+            customer.value = {
+                full_name: next.order.customer_name,
+                phone: next.order.customer_phone,
+                city: next.order.customer_city,
+                address: next.order.customer_address,
+            };
+            lines.value = next.order.items.flatMap((item) =>
+                item.product
+                    ? [
+                          {
+                              product_public_id: item.product.public_id,
+                              variant_public_id:
+                                  item.variant?.public_id || null,
+                              quantity: item.quantity,
+                              label: item.product_name_snapshot,
+                              variants: item.product.variants.filter(
+                                  (variant) => variant.is_active,
+                              ),
+                          },
+                      ]
+                    : [],
+            );
+        };
+        onMounted(async () => {
+            try {
+                await refresh();
+            } catch (cause: unknown) {
+                showError(cause instanceof Error ? cause.message : 'Impossible de charger la commande.');
+            } finally {
+                loading.value = false;
+            }
+        });
+        const run = async (path: string, method: string, body: unknown, successMessage: string) => {
+            saving.value = true;
+            try {
+                await api(path, method, body);
+                await refresh();
+                showToast('success', successMessage);
+            } catch (cause: unknown) {
+                showError(cause instanceof Error ? cause.message : 'Opération impossible.');
+            } finally {
+                saving.value = false;
+            }
+        };
+        return {
+            detail,
+            lines,
+            customer,
+            note,
+            loading,
+            saving,
+            error,
+            money,
+            print: () => window.print(),
+            saveCustomer: () =>
+                detail.value &&
+                run(`orders/${detail.value.order.public_reference}`, 'PATCH', {
+                    lock_version: detail.value.order.lock_version,
+                    customer: customer.value,
+                }, 'Informations client mises à jour.'),
+            saveItems: () =>
+                detail.value &&
+                run(
+                    `orders/${detail.value.order.public_reference}/items`,
+                    'PUT',
+                    {
+                        lock_version: detail.value.order.lock_version,
+                        items: lines.value.map(
+                            ({
+                                product_public_id,
+                                variant_public_id,
+                                quantity,
+                            }) => ({
+                                product_public_id,
+                                variant_public_id,
+                                quantity,
+                            }),
+                        ),
+                    }, 'Articles recalculés.'
+                ),
+            transition: async (status: string) => {
+                if (!detail.value) return;
+                const destructive = ['annulee', 'echec_livraison', 'retournee'].includes(status);
+                const confirmed = await confirmAction('Changer le statut de la commande ?', `La commande passera à l’état « ${status} ».`, 'Confirmer', destructive ? 'danger' : 'default');
+                if (!confirmed) return;
+                await run(
+                    `orders/${detail.value.order.public_reference}/transitions`,
+                    'POST',
+                    {
+                        to_status: status,
+                        lock_version: detail.value.order.lock_version,
+                        reason: [
+                            'annulee',
+                            'echec_livraison',
+                            'retournee',
+                        ].includes(status)
+                            ? 'Décision opérateur'
+                            : null,
+                        restock_items: status === 'retournee',
+                    },
+                    'Statut de la commande mis à jour.',
+                );
+            },
+            addNote: () =>
+                detail.value &&
+                note.value.trim() &&
+                run(
+                    `orders/${detail.value.order.public_reference}/notes`,
+                    'POST',
+                    { body: note.value.trim() }, 'Note ajoutée.',
+                ),
+        };
     },
     // eslint-disable-next-line quotes
     template: `<section class="admin-page"><RouterLink class="text-link" to="/orders">Retour aux commandes</RouterLink><p v-if="loading">Chargement…</p><p v-else-if="error" class="admin-alert">{{ error }}</p><template v-else-if="detail"><header><div><p class="admin-eyebrow">Commande</p><h1>{{ detail.order.public_reference }}</h1></div><button class="admin-action" @click="print">Imprimer</button></header><div class="admin-order-summary"><p><strong>{{ detail.order.status }}</strong></p><p>{{ money(detail.order.total_millimes) }}</p><small>Suivi Meta: {{ detail.meta_purchase.status }}</small></div><section class="admin-order-section"><h2>Articles</h2><form v-if="detail.is_editable" class="admin-form" @submit.prevent="saveItems"><div v-for="line in lines" class="admin-line-editor"><strong>{{ line.label }}</strong><label>Quantité<input v-model.number="line.quantity" type="number" min="1" max="99" required></label><label v-if="line.variants.length">Variante<select v-model="line.variant_public_id" required><option v-for="variant in line.variants" :value="variant.public_id">{{ variant.sku || variant.values.map(value => value.value).join(' · ') }}</option></select></label></div><button class="admin-action" :disabled="saving">Recalculer les articles</button></form><div class="admin-table"><article v-for="item in detail.order.items"><strong>{{ item.product_name_snapshot }}</strong><span>× {{ item.quantity }}</span><span>{{ money(item.line_total_millimes) }}</span></article></div></section><div class="admin-actions"><button v-for="status in detail.allowed_transitions" class="admin-action" :disabled="saving" @click="transition(status)">{{ status }}</button></div><section class="admin-order-section"><h2>Livraison</h2><form v-if="detail.is_editable" class="admin-form" @submit.prevent="saveCustomer"><label>Nom complet<input v-model.trim="customer.full_name" required></label><label>Téléphone<input v-model.trim="customer.phone" required></label><label>Ville<input v-model.trim="customer.city" required></label><label>Adresse<textarea v-model="customer.address" required></textarea></label><button class="admin-action" :disabled="saving">Mettre à jour</button></form></section><section class="admin-order-section"><h2>Notes internes</h2><form class="admin-form" @submit.prevent="addNote"><label>Note<textarea v-model="note" required></textarea></label><button class="admin-action" :disabled="saving">Ajouter la note</button></form></section></template></section>`,
