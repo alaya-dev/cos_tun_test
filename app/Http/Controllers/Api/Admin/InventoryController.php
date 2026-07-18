@@ -14,7 +14,7 @@ class InventoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate(['product_public_id' => ['nullable', 'ulid'], 'per_page' => ['nullable', 'integer', 'between:1,100']]);
-        $query = InventoryMovement::query()->with('product')->latest();
+        $query = InventoryMovement::query()->with(['product', 'variant'])->latest();
         if ($data['product_public_id'] ?? null) {
             $query->whereHas('product', fn ($products) => $products->where('public_id', $data['product_public_id']));
         }
