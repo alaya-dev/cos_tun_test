@@ -14,9 +14,6 @@ class SwitchProductVariantModeAction
             return $product;
         }
         if ($hasVariants) {
-            if ($product->is_active) {
-                throw ValidationException::withMessages(['has_variants' => 'Désactivez le produit avant de modifier son mode de variantes.']);
-            }
             if ($product->stock_quantity === null) {
                 throw ValidationException::withMessages(['stock_quantity' => 'Le stock produit est requis avant d’activer les variantes.']);
             }
@@ -24,9 +21,7 @@ class SwitchProductVariantModeAction
             return DB::transaction(function () use ($product): Product {
                 $product->update(['has_variants' => true, 'stock_quantity' => null, 'low_stock_threshold' => null, 'lock_version' => $product->lock_version + 1]);
 
-                $product->refresh();
-
-                return $product;
+                return $product->refresh();
             });
         }
         if ($resultingStockQuantity === null || $resultingStockQuantity < 0) {
@@ -38,9 +33,7 @@ class SwitchProductVariantModeAction
             $product->optionGroups()->delete();
             $product->update(['has_variants' => false, 'stock_quantity' => $resultingStockQuantity, 'low_stock_threshold' => null, 'lock_version' => $product->lock_version + 1]);
 
-            $product->refresh();
-
-            return $product;
+            return $product->refresh();
         });
     }
 }

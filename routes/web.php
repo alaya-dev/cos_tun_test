@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\StorefrontCatalogController;
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\StorefrontCatalogController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [StorefrontCatalogController::class, 'home'])->name('storefront.home');

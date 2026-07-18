@@ -28,7 +28,9 @@ class ProductController extends Controller
             'sort' => ['nullable', 'in:name,-name,created_at,-created_at,regular_price_millimes,-regular_price_millimes'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
-        $query = Product::query()->with(['category', 'images' => fn ($images) => $images->where('is_primary', true)->select(['id', 'product_id', 'path', 'processing_status', 'is_primary'])]);
+        $query = Product::query()
+            ->with(['category', 'images' => fn ($images) => $images->where('is_primary', true)->select(['id', 'product_id', 'path', 'processing_status', 'is_primary'])])
+            ->withSum(['variants as active_variant_stock_quantity' => fn ($variants) => $variants->where('is_active', true)], 'stock_quantity');
 
         if ($data['search'] ?? null) {
             $query->where('name', 'like', '%'.$data['search'].'%');
@@ -65,7 +67,14 @@ class ProductController extends Controller
         $sort = $data['sort'] ?? '-created_at';
         $query->orderBy(ltrim($sort, '-'), str_starts_with($sort, '-') ? 'desc' : 'asc');
 
-        return response()->json(['data' => $query->paginate($data['per_page'] ?? 25)]);
+        $products = $query->paginate($data['per_page'] ?? 25);
+        $products->getCollection()->each(function (Product $product): void {
+            if ($product->has_variants) {
+                $product->setAttribute('active_variant_stock_quantity', (int) ($product->active_variant_stock_quantity ?? 0));
+            }
+        });
+
+        return response()->json(['data' => $products]);
     }
 
     public function store(Request $request, CreateProductAction $action): JsonResponse
@@ -77,7 +86,7 @@ class ProductController extends Controller
 
     public function show(Product $product): JsonResponse
     {
-        return response()->json(['data' => $product->load('category', 'images', 'optionGroups.values', 'variants.values')]);
+        return response()->json(['data' => $product->load('category', 'images.variant', 'optionGroups.values', 'variants.values')]);
     }
 
     public function update(Request $request, Product $product): JsonResponse
@@ -121,7 +130,7 @@ class ProductController extends Controller
 
     public function variantMode(Request $request, Product $product, SwitchProductVariantModeAction $action): JsonResponse
     {
-        $data = $request->validate(['has_variants' => ['required', 'boolean'], 'confirmation' => ['required', 'in:CONFIRMER'], 'resulting_stock_quantity' => ['nullable', 'integer', 'min:0']]);
+        $data = $request->validate(['has_variants' => ['required', 'boolean'], 'confirmation' => ['nullable', 'in:CONFIRMER'], 'resulting_stock_quantity' => ['nullable', 'integer', 'min:0']]);
 
         return response()->json(['data' => $action->handle($product, $data['has_variants'], $data['resulting_stock_quantity'] ?? null)]);
     }

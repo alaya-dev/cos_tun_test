@@ -20,7 +20,7 @@ class CategoryController extends Controller
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
         $sort = $data['sort'] ?? 'sort_order';
-        $categories = Category::query()
+        $categories = Category::query()->withCount('products')
             ->when($data['search'] ?? null, fn ($query, $search) => $query->where('name', 'like', '%'.$search.'%'))
             ->when(array_key_exists('is_active', $data), fn ($query) => $query->where('is_active', $data['is_active']))
             ->orderBy(ltrim($sort, '-'), str_starts_with($sort, '-') ? 'desc' : 'asc')

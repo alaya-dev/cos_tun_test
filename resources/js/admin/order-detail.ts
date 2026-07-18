@@ -7,8 +7,8 @@ type Item = { product_name_snapshot: string; quantity: number; line_total_millim
 type Order = { public_reference: string; lock_version: number; customer_name: string; customer_phone: string; customer_city: string; customer_address: string; status: string; total_millimes: number; items: Item[]; notes: { body: string }[]; status_history: { from_status: string; to_status: string; reason: string | null }[] };
 type Detail = { order: Order; is_editable: boolean; allowed_transitions: string[]; meta_purchase: { status: string } };
 type Line = { product_public_id: string; variant_public_id: string | null; quantity: number; label: string; variants: Variant[] };
-const money = (value: number) => `${(value / 1000).toFixed(3).replace('.', ',')} TND`;
-async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> { const response = await fetch(`/api/v1/admin/${path}`, { method, credentials: 'same-origin', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }); if (!response.ok) { const data = await response.json().catch(() => null) as { message?: string } | null; throw new Error(data?.message || 'Opération impossible.'); } return response.json() as Promise<T>; }
+const money = (value: number) => `${(value / 1000).toFixed(3).replace('.', ',')} DT`;
+async function api<T>(path: string, method = 'GET', body?: unknown): Promise<T> { const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || ''; const response = await fetch(`/api/v1/admin/${path}`, { method, credentials: 'same-origin', headers: { Accept: 'application/json', ...(body === undefined ? {} : { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }); if (!response.ok) { const data = await response.json().catch(() => null) as { message?: string } | null; throw new Error(data?.message || 'Opération impossible.'); } return response.json() as Promise<T>; }
 
 const OrderDetailView: Component = {
     components: { RouterLink },
