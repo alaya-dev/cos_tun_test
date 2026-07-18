@@ -1,4 +1,4 @@
-import { createApp, onMounted, ref } from 'vue';
+import { createApp, onMounted, ref, type Component } from 'vue';
 import { createPinia } from 'pinia';
 import { createRouter, createWebHistory, RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 
@@ -6,7 +6,7 @@ type Page<T> = { data: T[]; current_page: number; last_page: number };
 type Category = { public_id: string; name: string; slug: string; description?: string | null; is_active: boolean; sort_order: number; seo_title?: string | null; seo_description?: string | null };
 type Product = { public_id: string; name: string; slug: string; stock_quantity: number | null; low_stock_threshold?: number | null; has_variants: boolean; is_active: boolean; category?: { name: string; public_id?: string }; regular_price_millimes: number; promotional_price_millimes?: number | null; short_description?: string | null; full_description?: string | null; seo_title?: string | null; seo_description?: string | null };
 type ProductImage = { public_id: string; path: string | null; alt_text: string | null; is_primary: boolean; processing_status: string; sort_order: number };
-type ProductDetail = Product & { category_id?: number; images: ProductImage[] };
+type ProductDetail = Product & { category_id?: number; lock_version: number; images: ProductImage[]; option_groups: VariantGroup[]; variants: ProductVariant[] };
 type Order = { public_reference: string; customer_name: string; status: string; total_millimes: number; created_at: string };
 type Movement = { public_id: string; type: string; quantity_delta: number; reason: string; created_at: string; product?: { name: string } };
 
@@ -68,8 +68,66 @@ const Products = {
       <p v-if="loading">Chargement…</p><p v-else-if="error" class="admin-alert">{{ error }}</p><div v-else class="admin-table"><RouterLink v-for="product in rows" :key="product.public_id" :to="'/products/' + product.public_id"><article><div><strong>{{ product.name }}</strong><small>{{ product.category?.name || 'Sans catégorie' }}</small></div><span>{{ product.stock_quantity ?? 'Variantes' }}</span><span>{{ money(product.regular_price_millimes) }}</span><span :class="product.is_active ? 'status-active' : 'status-muted'">{{ product.is_active ? 'Actif' : 'Inactif' }}</span></article></RouterLink></div></section>`,
 };
 
+type VariantValue = { id: number; value: string };
+type VariantGroup = { id: number; name: string; values: VariantValue[] };
+type ProductVariant = { public_id: string; sku: string | null; stock_quantity: number; low_stock_threshold: number | null; is_active: boolean; values: VariantValue[] };
+type VariantProduct = Product & { lock_version: number; option_groups: VariantGroup[]; variants: ProductVariant[] };
+type VariantDraft = { keys: string[]; sku: string; stock_quantity: number; low_stock_threshold: number; is_active: boolean };
+
+const VariantEditor: Component = {
+    props: { product: { type: Object, required: true } },
+    emits: ['updated'],
+    setup(props: { product?: unknown }, { emit }: { emit: (event: string) => void }) {
+        const product = props.product as VariantProduct;
+        const confirmation = ref('');
+        const resultingStock = ref(0);
+        const saving = ref(false);
+        const error = ref('');
+        const groups = ref<{ name: string; valuesText: string }[]>(product.option_groups.map(group => ({ name: group.name, valuesText: group.values.map(value => value.value).join(', ') })));
+        const variants = ref<VariantDraft[]>([]);
+        const keyFor = (groupIndex: number, value: string) => `${groupIndex}:${value.trim().toLocaleLowerCase()}`;
+        const groupValues = () => groups.value.map(group => group.valuesText.split(',').map(value => value.trim()).filter(Boolean));
+        const regenerate = () => {
+            const values = groupValues();
+            if (!values.length || values.some(group => !group.length)) { variants.value = []; return; }
+            const existing = new Map(variants.value.map(variant => [variant.keys.join('|'), variant]));
+            const combinations = values.reduce<string[][]>((all, group, groupIndex) => all.flatMap(combination => group.map(value => [...combination, keyFor(groupIndex, value)])), [[]]);
+            variants.value = combinations.map(keys => existing.get(keys.join('|')) || { keys, sku: '', stock_quantity: 0, low_stock_threshold: 0, is_active: true });
+        };
+        const addGroup = () => { if (groups.value.length < 5) groups.value.push({ name: '', valuesText: '' }); };
+        const removeGroup = (index: number) => { groups.value.splice(index, 1); regenerate(); };
+        if (product.has_variants) {
+            variants.value = product.variants.map(variant => ({
+                keys: variant.values.map(value => {
+                    const groupIndex = product.option_groups.findIndex(group => group.values.some(candidate => candidate.id === value.id));
+                    return keyFor(groupIndex, value.value);
+                }).sort(),
+                sku: variant.sku || '', stock_quantity: variant.stock_quantity, low_stock_threshold: variant.low_stock_threshold || 0, is_active: variant.is_active,
+            }));
+        }
+        const switchMode = async (hasVariants: boolean) => {
+            saving.value = true; error.value = '';
+            try {
+                await write(`products/${product.public_id}/variant-mode`, 'POST', { has_variants: hasVariants, confirmation: confirmation.value, resulting_stock_quantity: hasVariants ? null : resultingStock.value });
+                confirmation.value = ''; emit('updated');
+            } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; }
+        };
+        const save = async () => {
+            if (!groups.value.length || groups.value.some(group => !group.name.trim()) || !variants.value.length) { error.value = 'Ajoutez un nom et au moins une valeur dans chaque option, puis générez les combinaisons.'; return; }
+            saving.value = true; error.value = '';
+            try {
+                const optionGroups = groups.value.map((group, groupIndex) => ({ name: group.name.trim(), values: groupValues()[groupIndex].map(value => ({ client_key: keyFor(groupIndex, value), value })) }));
+                await write(`products/${product.public_id}/variants`, 'PUT', { lock_version: product.lock_version, option_groups: optionGroups, variants: variants.value.map(variant => ({ option_value_client_keys: variant.keys, sku: variant.sku || null, stock_quantity: variant.stock_quantity, low_stock_threshold: variant.low_stock_threshold, is_active: variant.is_active })) });
+                emit('updated');
+            } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { saving.value = false; }
+        };
+        return { confirmation, resultingStock, saving, error, groups, variants, regenerate, addGroup, removeGroup, switchMode, save };
+    },
+    template: '<section class="admin-variants"><div><p class="admin-eyebrow">Variantes</p><h2>Déclinaisons et stock</h2><p>Chaque enregistrement remplace les combinaisons de façon atomique. Vérifiez les stocks avant de confirmer.</p></div><p v-if="error" class="admin-alert">{{ error }}</p><template v-if="!product.has_variants"><p class="admin-empty">Ce produit utilise actuellement un stock unique.</p><form class="admin-inline-form" @submit.prevent="switchMode(true)"><label>Pour activer les variantes, saisissez CONFIRMER.<input v-model="confirmation" required pattern="CONFIRMER"></label><button class="admin-action" :disabled="saving">Activer les variantes</button></form></template><template v-else><div class="admin-variant-groups"><div v-for="(group, index) in groups" class="admin-variant-group"><label>Nom d’option<input v-model="group.name" maxlength="120" required></label><label>Valeurs, séparées par des virgules<input v-model="group.valuesText" maxlength="1000" required @change="regenerate"></label><button class="text-link" type="button" @click="removeGroup(index)">Retirer l’option</button></div></div><button class="text-link" type="button" :disabled="groups.length >= 5" @click="addGroup">Ajouter une option</button><button class="text-link" type="button" @click="regenerate">Générer les combinaisons</button><p v-if="!variants.length" class="admin-empty">Ajoutez des valeurs puis générez les combinaisons.</p><div v-else class="admin-table"><article v-for="variant in variants"><div><strong>{{ variant.keys.join(\' · \') }}</strong><label>SKU<input v-model="variant.sku" maxlength="100"></label></div><label>Stock<input v-model.number="variant.stock_quantity" type="number" min="0" required></label><label>Seuil bas<input v-model.number="variant.low_stock_threshold" type="number" min="0"></label><label class="admin-check"><input v-model="variant.is_active" type="checkbox"> Active</label></article></div><button class="admin-action" :disabled="saving" @click="save">{{ saving ? \'Enregistrement…\' : \'Enregistrer les variantes\' }}</button><form class="admin-inline-form admin-danger-zone" @submit.prevent="switchMode(false)"><label>Stock unique après désactivation<input v-model.number="resultingStock" type="number" min="0" required></label><label>Saisissez CONFIRMER pour désactiver les variantes.<input v-model="confirmation" required pattern="CONFIRMER"></label><button class="text-link" :disabled="saving">Désactiver les variantes</button></form></template></section>',
+};
+
 const ProductEditor = {
-    components: { RouterLink },
+    components: { RouterLink, VariantEditor },
     setup() {
         const route = useRoute();
         const categories = ref<Category[]>([]);
@@ -123,11 +181,11 @@ const ProductEditor = {
             try { await write(`products/${product.value.public_id}/images/reorder`, 'POST', { items: images.map((image, sort_order) => ({ public_id: image.public_id, sort_order })) }); await refresh(); } catch (cause: unknown) { uploadError.value = cause instanceof Error ? cause.message : 'Erreur'; }
         };
         const imageUrl = (image: ProductImage) => image.path ? `/storage/${image.path}` : '';
-        return { categories, product, loading, saving, uploading, error, uploadError, form, save, upload, updateImage, removeImage, moveImage, imageUrl, money };
+        return { categories, product, loading, saving, uploading, error, uploadError, form, save, upload, updateImage, removeImage, moveImage, imageUrl, money, refresh };
     },
     template: `<section class="admin-page"><RouterLink class="text-link" to="/products">Retour aux produits</RouterLink><p v-if="loading">Chargement…</p><p v-else-if="error" class="admin-alert">{{ error }}</p><template v-else-if="product"><header><div><p class="admin-eyebrow">Fiche produit</p><h1>{{ product.name }}</h1></div><span :class="product.is_active ? 'status-active' : 'status-muted'">{{ product.is_active ? 'Publié' : 'Brouillon' }}</span></header>
       <form class="admin-form" @submit.prevent="save"><label>Catégorie<select v-model="form.category_public_id" required><option value="">Choisir</option><option v-for="category in categories" :value="category.public_id">{{ category.name }}</option></select></label><label>Nom<input v-model="form.name" required maxlength="200"></label><label>Slug<input v-model="form.slug" required maxlength="190"></label><label>Prix normal (millimes)<input v-model.number="form.regular_price_millimes" type="number" min="0" required></label><label>Prix promotionnel<input v-model.number="form.promotional_price_millimes" type="number" min="0"></label><label v-if="!product.has_variants">Stock<input v-model.number="form.stock_quantity" type="number" min="0" required></label><label v-if="!product.has_variants">Seuil bas<input v-model.number="form.low_stock_threshold" type="number" min="0"></label><label>Description courte<textarea v-model="form.short_description"></textarea></label><label>Description complète<textarea v-model="form.full_description"></textarea></label><label>Titre SEO<input v-model="form.seo_title" maxlength="255"></label><label>Description SEO<textarea v-model="form.seo_description" maxlength="320"></textarea></label><label class="admin-check"><input v-model="form.is_active" type="checkbox"> Publier le produit</label><button class="admin-action" :disabled="saving">{{ saving ? 'Enregistrement…' : 'Enregistrer les informations' }}</button></form>
-      <section class="admin-media"><div><p class="admin-eyebrow">Médias</p><h2>Images produit</h2><p>JPG, PNG ou WebP, 10 Mo maximum. L’image est validée et traitée en arrière-plan.</p></div><label class="admin-upload"><input type="file" accept="image/jpeg,image/png,image/webp" :disabled="uploading" @change="upload"><span>{{ uploading ? 'Import en cours…' : 'Importer une image' }}</span></label><p v-if="uploadError" class="admin-alert">{{ uploadError }}</p><p v-if="!product.images.length" class="admin-empty">Aucune image. Ajoutez une image produit avec un texte alternatif précis.</p><ol v-else class="admin-image-list"><li v-for="(image, index) in product.images" :key="image.public_id"><div class="admin-image-preview"><img v-if="imageUrl(image)" :src="imageUrl(image)" :alt="image.alt_text || product.name"><span v-else>Traitement</span></div><div><strong>{{ image.is_primary ? 'Image principale' : 'Image secondaire' }}</strong><small>{{ image.processing_status }}</small><label>Texte alternatif<input v-model="image.alt_text" maxlength="255" @change="updateImage(image)"></label></div><div class="admin-image-actions"><label class="admin-check"><input v-model="image.is_primary" type="radio" name="primary-image" @change="updateImage(image)"> Principale</label><button class="text-link" :disabled="index === 0" @click="moveImage(index, -1)">Monter</button><button class="text-link" :disabled="index === product.images.length - 1" @click="moveImage(index, 1)">Descendre</button><button class="text-link" @click="removeImage(image)">Retirer</button></div></li></ol></section></template></section>`,
+      <section class="admin-media"><div><p class="admin-eyebrow">Médias</p><h2>Images produit</h2><p>JPG, PNG ou WebP, 10 Mo maximum. L’image est validée et traitée en arrière-plan.</p></div><label class="admin-upload"><input type="file" accept="image/jpeg,image/png,image/webp" :disabled="uploading" @change="upload"><span>{{ uploading ? 'Import en cours…' : 'Importer une image' }}</span></label><p v-if="uploadError" class="admin-alert">{{ uploadError }}</p><p v-if="!product.images.length" class="admin-empty">Aucune image. Ajoutez une image produit avec un texte alternatif précis.</p><ol v-else class="admin-image-list"><li v-for="(image, index) in product.images" :key="image.public_id"><div class="admin-image-preview"><img v-if="imageUrl(image)" :src="imageUrl(image)" :alt="image.alt_text || product.name"><span v-else>Traitement</span></div><div><strong>{{ image.is_primary ? 'Image principale' : 'Image secondaire' }}</strong><small>{{ image.processing_status }}</small><label>Texte alternatif<input v-model="image.alt_text" maxlength="255" @change="updateImage(image)"></label></div><div class="admin-image-actions"><label class="admin-check"><input v-model="image.is_primary" type="radio" name="primary-image" @change="updateImage(image)"> Principale</label><button class="text-link" :disabled="index === 0" @click="moveImage(index, -1)">Monter</button><button class="text-link" :disabled="index === product.images.length - 1" @click="moveImage(index, 1)">Descendre</button><button class="text-link" @click="removeImage(image)">Retirer</button></div></li></ol></section><VariantEditor :product="product" @updated="refresh"></VariantEditor></template></section>`,
 };
 
 const Orders = { setup() { const rows = ref<Order[]>([]); const error = ref(''); const loading = ref(true); const search = ref(''); const status = ref(''); const load = async () => { loading.value = true; try { const query = new URLSearchParams({ per_page: '25' }); if (search.value) query.set('search', search.value); if (status.value) query.set('status', status.value); rows.value = (await api<{ data: Page<Order> }>(`orders?${query}`)).data.data; } catch (cause: unknown) { error.value = cause instanceof Error ? cause.message : 'Erreur'; } finally { loading.value = false; } }; onMounted(load); const exportCsv = () => { const query = new URLSearchParams(); if (status.value) query.set('status', status.value); window.location.assign(`/api/v1/admin/orders/export?${query}`); }; return { rows, error, loading, search, status, load, exportCsv, money }; }, template: '<section class="admin-page"><header><div><p class="admin-eyebrow">Opérations</p><h1>Commandes</h1></div><button class="admin-action" @click="exportCsv">Exporter CSV</button></header><form class="admin-form" @submit.prevent="load"><label>Recherche<input v-model.trim="search" placeholder="Référence, client, téléphone"></label><label>Statut<select v-model="status"><option value="">Tous</option><option value="nouvelle">Nouvelle</option><option value="confirmee">Confirmée</option><option value="annulee">Annulée</option><option value="livree">Livrée</option><option value="echec_livraison">Échec livraison</option><option value="retournee">Retournée</option></select></label><button class="admin-action">Filtrer</button></form><p v-if="loading">Chargement…</p><p v-else-if="error" class="admin-alert">{{ error }}</p><div v-else class="admin-table"><RouterLink v-for="order in rows" :key="order.public_reference" :to="\'/orders/\' + order.public_reference"><article><div><strong>{{ order.public_reference }}</strong><small>{{ order.customer_name }}</small></div><span>{{ money(order.total_millimes) }}</span><span class="status-muted">{{ order.status }}</span></article></RouterLink></div></section>', methods: { money } };
