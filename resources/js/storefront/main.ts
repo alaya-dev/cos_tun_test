@@ -5,6 +5,8 @@ type RitualCategory = { name: string; url: string };
 type CartItem = { product_public_id: string; variant_public_id: string | null; quantity: number };
 type QuoteLine = { product_public_id: string; variant_public_id: string | null; name: string; variant_label: string | null; quantity_requested: number; is_available: boolean; effective_unit_price: { formatted: string }; line_total: { formatted: string }; messages: string[] };
 type Quote = { data: { items: QuoteLine[]; pricing: { subtotal: { formatted: string }; shipping: { fee: { formatted: string } }; total: { formatted: string } }; can_checkout: boolean } };
+type CheckoutField = { key: string; label: string; type: 'text' | 'textarea'; is_required: boolean; sort_order: number };
+type CheckoutFieldsResponse = { data: CheckoutField[]; meta: { schema_version: string } };
 const CART_KEY = 'pc_cart_v1';
 const CART_TTL = 7 * 24 * 60 * 60 * 1000;
 
@@ -86,9 +88,10 @@ if (detail) {
         if (image && button.dataset.galleryImage) image.src = button.dataset.galleryImage;
     }));
     const rawVariants = detail.dataset.productVariants;
+    const variants = rawVariants ? JSON.parse(rawVariants) as Variant[] : [];
     const addButton = detail.querySelector<HTMLButtonElement>('[data-add-to-cart]');
-    if (rawVariants) setupVariants(detail, JSON.parse(rawVariants) as Variant[], (id) => { variantId = id; }); else if (addButton) addButton.disabled = false;
-    addButton?.addEventListener('click', () => { const productId = detail.dataset.productPublicId; if (!productId || (rawVariants && !variantId)) return; addToCart({ product_public_id: productId, variant_public_id: variantId, quantity }); addButton.textContent = 'Ajouté au panier'; window.setTimeout(() => { addButton.textContent = 'Ajouter au panier'; }, 1400); });
+    if (variants.length) setupVariants(detail, variants, (id) => { variantId = id; }); else if (addButton) addButton.disabled = false;
+    addButton?.addEventListener('click', () => { const productId = detail.dataset.productPublicId; if (!productId || (variants.length && !variantId)) return; addToCart({ product_public_id: productId, variant_public_id: variantId, quantity }); addButton.textContent = 'Ajouté au panier'; window.setTimeout(() => { addButton.textContent = 'Ajouter au panier'; }, 1400); });
 }
 
 function setupVariants(detailElement: HTMLElement, variants: Variant[], onSelect: (id: string | null) => void): void {
@@ -114,3 +117,24 @@ function setupVariants(detailElement: HTMLElement, variants: Variant[], onSelect
 const cartPage = document.querySelector<HTMLElement>('[data-cart-page]');
 if (cartPage) renderCartPage(cartPage);
 async function renderCartPage(host: HTMLElement): Promise<void> { const items = cart(); if (!items.length) { host.innerHTML = '<p class="catalogue-empty">Votre panier est vide. <a class="text-link" href="/produits">Découvrir les soins</a></p>'; return; } try { const payload = await quote(items); const quoteData = payload.data; host.innerHTML = `<div class="cart-layout"><div class="cart-lines">${quoteData.items.map((line, index) => `<article class="cart-line"><div><h2>${escapeHtml(line.name)}</h2><p>${escapeHtml(line.variant_label ?? '')}</p>${line.messages.map(escapeHtml).join('<p class="commerce-alert">')}</p></div><strong>${line.line_total.formatted}</strong><div class="cart-stepper"><button type="button" data-cart-change="${index}" data-delta="-1">−</button><span>${line.quantity_requested}</span><button type="button" data-cart-change="${index}" data-delta="1">+</button><button type="button" data-cart-remove="${index}">Retirer</button></div></article>`).join('')}</div><aside class="cart-summary"><p>Sous-total <strong>${quoteData.pricing.subtotal.formatted}</strong></p><p>Livraison <strong>${quoteData.pricing.shipping.fee.formatted}</strong></p><p class="cart-total">Total <strong>${quoteData.pricing.total.formatted}</strong></p><p>Paiement à la livraison.</p><a class="button button-dark ${quoteData.can_checkout ? '' : 'is-disabled'}" ${quoteData.can_checkout ? 'href="/commande"' : 'aria-disabled="true"'}>Finaliser ma commande</a></aside></div>`; host.querySelectorAll<HTMLButtonElement>('[data-cart-change]').forEach((button) => button.addEventListener('click', () => { const index = Number(button.dataset.cartChange); const updated = cart(); const item = updated[index]; if (!item) return; item.quantity = Math.max(1, Math.min(99, item.quantity + Number(button.dataset.delta))); saveCart(updated); renderCartPage(host); })); host.querySelectorAll<HTMLButtonElement>('[data-cart-remove]').forEach((button) => button.addEventListener('click', () => { const updated = cart(); updated.splice(Number(button.dataset.cartRemove), 1); saveCart(updated); renderCartPage(host); })); } catch { host.innerHTML = '<p class="commerce-alert">Le panier est momentanément indisponible. Réessayez dans un instant.</p>'; } }
+
+const checkoutPage = document.querySelector<HTMLElement>('[data-checkout-page]');
+if (checkoutPage) renderCheckout(checkoutPage);
+async function renderCheckout(host: HTMLElement): Promise<void> {
+    const items = cart();
+    if (!items.length) { host.innerHTML = '<p class="catalogue-empty">Votre panier est vide. <a class="text-link" href="/produits">Découvrir les soins</a></p>'; return; }
+    try {
+        const [fieldResponse, quoted] = await Promise.all([fetch('/api/v1/public/checkout-fields', { headers: { Accept: 'application/json' } }), quote(items)]);
+        if (!fieldResponse.ok || !quoted.data.can_checkout) { host.innerHTML = '<p class="commerce-alert">Votre panier a changé. Retournez au panier pour le mettre à jour.</p>'; return; }
+        const fields = await fieldResponse.json() as CheckoutFieldsResponse;
+        host.innerHTML = `<div class="checkout-layout"><form class="checkout-form" data-order-form novalidate><div class="form-errors" data-form-errors aria-live="assertive"></div>${fields.data.map((field) => `<label>${escapeHtml(field.label)}${field.is_required ? ' *' : ''}${field.type === 'textarea' ? `<textarea name="${escapeHtml(field.key)}" required></textarea>` : `<input name="${escapeHtml(field.key)}" type="text" autocomplete="${field.key === 'phone' ? 'tel' : field.key === 'full_name' ? 'name' : 'address'}" required>`}</label>`).join('')}<p class="privacy-note">Vos informations servent uniquement à traiter et confirmer votre commande.</p><button class="button button-dark" type="submit">Confirmer la commande</button></form><aside class="cart-summary"><p>Sous-total <strong>${quoted.data.pricing.subtotal.formatted}</strong></p><p>Livraison <strong>${quoted.data.pricing.shipping.fee.formatted}</strong></p><p class="cart-total">Total <strong>${quoted.data.pricing.total.formatted}</strong></p><p>Paiement à la livraison.</p></aside></div>`;
+        const form = host.querySelector<HTMLFormElement>('[data-order-form]');
+        form?.addEventListener('submit', async (event) => { event.preventDefault(); await submitOrder(form, fields.meta.schema_version, items); });
+    } catch { host.innerHTML = '<p class="commerce-alert">La commande est momentanément indisponible. Réessayez dans un instant.</p>'; }
+}
+function checkoutKey(): string { const key = sessionStorage.getItem('pc_checkout_key'); if (key) return key; const created = crypto.randomUUID(); sessionStorage.setItem('pc_checkout_key', created); return created; }
+async function submitOrder(form: HTMLFormElement, schemaVersion: string, items: CartItem[]): Promise<void> {
+    const button = form.querySelector<HTMLButtonElement>('button[type="submit"]'); const errors = form.querySelector<HTMLElement>('[data-form-errors]'); const customer = Object.fromEntries(new FormData(form).entries()) as Record<string, string>;
+    if (button) { button.disabled = true; button.textContent = 'Confirmation en cours…'; } if (errors) errors.textContent = '';
+    try { const response = await fetch('/api/v1/public/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'Idempotency-Key': checkoutKey() }, body: JSON.stringify({ checkout_schema_version: schemaVersion, customer, items }) }); const payload = await response.json() as { data?: { confirmation?: { url: string } }; message?: string }; if (!response.ok || !payload.data?.confirmation?.url) throw new Error(payload.message ?? 'order'); localStorage.removeItem(CART_KEY); sessionStorage.removeItem('pc_checkout_key'); window.location.assign(payload.data.confirmation.url); } catch (error: unknown) { if (errors) errors.textContent = error instanceof Error && error.message !== 'order' ? error.message : 'La commande n’a pas pu être confirmée. Vérifiez votre panier puis réessayez.'; if (button) { button.disabled = false; button.textContent = 'Confirmer la commande'; } }
+}

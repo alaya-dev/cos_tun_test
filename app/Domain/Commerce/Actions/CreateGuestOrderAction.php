@@ -18,8 +18,13 @@ class CreateGuestOrderAction
     public function handle(array $data, string $idempotencyKey): array
     {
         return DB::transaction(function () use ($data, $idempotencyKey): array {
+            $payloadHash = hash('sha256', json_encode($this->canonicalize($data), JSON_THROW_ON_ERROR));
             $existing = Order::query()->where('checkout_idempotency_key', $idempotencyKey)->first();
             if ($existing) {
+                if (! $existing->checkout_payload_hash || ! hash_equals($existing->checkout_payload_hash, $payloadHash)) {
+                    throw new CheckoutConflictException('CHECKOUT_IDEMPOTENCY_CONFLICT', 'Cette demande de commande ne correspond pas à la précédente tentative.');
+                }
+
                 return ['order' => $existing->load('items'), 'replayed' => true];
             }
             $fields = CheckoutField::query()->where('is_active', true)->orderBy('sort_order')->get();
@@ -58,7 +63,7 @@ class CreateGuestOrderAction
                 $lines[] = compact('product', 'variant', 'regular', 'effective', 'item');
             }
             $shipping = (int) config('commerce.shipping_fixed_fee_millimes');
-            $order = Order::query()->create(['checkout_idempotency_key' => $idempotencyKey, 'status' => 'nouvelle', 'customer_name' => trim($data['customer']['full_name']), 'customer_phone' => $this->phone($data['customer']['phone']), 'customer_city' => trim($data['customer']['city']), 'customer_address' => trim($data['customer']['address']), 'subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'promo_code_discount_millimes' => 0, 'shipping_fee_millimes' => $shipping, 'total_millimes' => $subtotal + $shipping]);
+            $order = Order::query()->create(['checkout_idempotency_key' => $idempotencyKey, 'checkout_payload_hash' => $payloadHash, 'status' => 'nouvelle', 'customer_name' => trim($data['customer']['full_name']), 'customer_phone' => $this->phone($data['customer']['phone']), 'customer_city' => trim($data['customer']['city']), 'customer_address' => trim($data['customer']['address']), 'subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'promo_code_discount_millimes' => 0, 'shipping_fee_millimes' => $shipping, 'total_millimes' => $subtotal + $shipping]);
             foreach ($lines as $line) {
                 $product = $line['product'];
                 $variant = $line['variant'];
@@ -87,5 +92,20 @@ class CreateGuestOrderAction
     private function phone(string $phone): string
     {
         return preg_replace('/[^0-9+]/', '', $phone) ?? $phone;
+    }
+
+    /** @param array<string, mixed> $value
+     * @return array<string, mixed>
+     */
+    private function canonicalize(array $value): array
+    {
+        ksort($value);
+        foreach ($value as $key => $item) {
+            if (is_array($item)) {
+                $value[$key] = $this->canonicalize($item);
+            }
+        }
+
+        return $value;
     }
 }

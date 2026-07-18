@@ -44,6 +44,15 @@ class GuestOrderTest extends TestCase
         $this->assertSame(1, $product->fresh()->stock_quantity);
     }
 
+    public function test_idempotency_key_rejects_a_different_payload(): void
+    {
+        $product = $this->product(4);
+        $key = '4af95712-4d91-4c57-8d29-917324200004';
+        $this->withHeader('Idempotency-Key', $key)->postJson('/api/v1/public/orders', $this->payload($product, 1))->assertCreated();
+        $this->withHeader('Idempotency-Key', $key)->postJson('/api/v1/public/orders', $this->payload($product, 2))->assertConflict()->assertJsonPath('code', 'CHECKOUT_IDEMPOTENCY_CONFLICT');
+        $this->assertSame(1, Order::query()->count());
+    }
+
     /** @return array<string, mixed> */
     private function payload(Product $product, int $quantity = 2): array
     {
