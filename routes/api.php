@@ -22,7 +22,7 @@ Route::prefix('v1/public')->group(function (): void {
     Route::post('/orders', GuestOrderController::class)->middleware('throttle:5,10');
 });
 
-Route::prefix('v1/admin')->middleware(['auth:sanctum', 'can:catalog.manage'])->group(function (): void {
+Route::prefix('v1/admin')->middleware(['web', 'auth', 'can:catalog.manage'])->group(function (): void {
     Route::post('categories/reorder', [CategoryController::class, 'reorder']);
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
