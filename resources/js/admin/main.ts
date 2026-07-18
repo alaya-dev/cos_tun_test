@@ -53,18 +53,18 @@ const Shell = {
         };
     },
     template: `<div class="admin-shell">
-      <aside>
+      <aside class="admin-sidebar">
         <a class="admin-brand" href="/admin">PASSION<br><small>COSMETIC · ADMIN</small></a>
         <nav aria-label="Navigation principale">
-          <RouterLink to="/products">Produits</RouterLink>
-          <RouterLink to="/categories">Catégories</RouterLink>
-          <RouterLink to="/orders">Commandes</RouterLink>
-          <RouterLink to="/inventory">Inventaire</RouterLink>
+          <RouterLink to="/products"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg><span>Produits</span></RouterLink>
+          <RouterLink to="/categories"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12V5h7l9 9-7 7-9-9Z"/><path d="M8 8h.01"/></svg><span>Catégories</span></RouterLink>
+          <RouterLink to="/orders"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l1 13H5L6 7Z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg><span>Commandes</span></RouterLink>
+          <RouterLink to="/inventory"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5v9l-9 5-9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v9"/></svg><span>Inventaire</span></RouterLink>
         </nav>
         <footer class="admin-profile"><span>Administration</span><button class="text-link" type="button" @click="logout">Déconnexion</button></footer>
       </aside>
       <main><div class="admin-topbar"><span>Passion Cosmetic</span><small>Back-office sécurisé</small></div><RouterView v-slot="{ Component }"><Transition name="admin-page" mode="out-in"><component :is="Component" /></Transition></RouterView></main>
-      <TransitionGroup name="admin-toast" tag="aside" class="admin-toast-stack" aria-live="polite" aria-relevant="additions">
+      <TransitionGroup name="admin-toast" tag="div" class="admin-toast-stack" aria-live="polite" aria-relevant="additions">
         <article v-for="toast in toasts" :key="toast.id" class="admin-toast" :class="'is-' + toast.tone" role="status">
           <span class="admin-toast-mark" aria-hidden="true">{{ toast.tone === 'success' ? '✓' : toast.tone === 'info' ? 'i' : '!' }}</span>
           <p>{{ toast.message }}</p>
