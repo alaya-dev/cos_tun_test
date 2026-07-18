@@ -9,6 +9,7 @@ use App\Domain\Commerce\Models\Order;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -16,8 +17,9 @@ class OrderController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $data = $request->validate(['search' => ['nullable', 'string', 'max:180'], 'status' => ['nullable', 'in:nouvelle,confirmee,annulee,livree,echec_livraison,retournee'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date'], 'min_total_millimes' => ['nullable', 'integer', 'min:0'], 'max_total_millimes' => ['nullable', 'integer', 'min:0'], 'sort' => ['nullable', 'in:created_at,-created_at,total_millimes,-total_millimes,status,customer_name'], 'per_page' => ['nullable', 'integer', 'between:1,100']]);
+        $data = $request->validate(['search' => ['nullable', 'string', 'max:180'], 'status' => ['nullable', 'in:nouvelle,confirmee,annulee,livree,echec_livraison,retournee'], 'archived' => ['nullable', 'boolean'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date'], 'min_total_millimes' => ['nullable', 'integer', 'min:0'], 'max_total_millimes' => ['nullable', 'integer', 'min:0'], 'sort' => ['nullable', 'in:created_at,-created_at,total_millimes,-total_millimes,status,customer_name'], 'per_page' => ['nullable', 'integer', 'between:1,100']]);
         $query = Order::query()->withCount('items');
+        ($data['archived'] ?? false) ? $query->whereNotNull('archived_at') : $query->whereNull('archived_at');
         if ($data['search'] ?? null) {
             $query->where(fn ($q) => $q->where('public_reference', 'like', '%'.$data['search'].'%')->orWhere('customer_name', 'like', '%'.$data['search'].'%')->orWhere('customer_phone', 'like', '%'.$data['search'].'%'));
         }
@@ -92,6 +94,72 @@ class OrderController extends Controller
         }
 
         return response()->json(['data' => $order->notes()->create(['user_id' => $actor->id, 'body' => $data['body'], 'created_at' => now()])], 201);
+    }
+
+    public function bulkArchive(Request $request): JsonResponse
+    {
+        $data = $request->validate(['references' => ['required', 'array', 'min:1', 'max:100'], 'references.*' => ['ulid', 'distinct']]);
+        $archived = DB::transaction(function () use ($data): int {
+            $orders = Order::query()->whereIn('public_reference', $data['references'])->whereNull('archived_at')->lockForUpdate()->get();
+            abort_if($orders->count() !== count($data['references']), 404);
+
+            $orders->each->update(['archived_at' => now()]);
+
+            return $orders->count();
+        });
+
+        return response()->json(['data' => ['archived' => $archived]]);
+    }
+
+    public function bulkRestore(Request $request): JsonResponse
+    {
+        $data = $request->validate(['references' => ['required', 'array', 'min:1', 'max:100'], 'references.*' => ['ulid', 'distinct']]);
+        $restored = DB::transaction(function () use ($data): int {
+            $orders = Order::query()->whereIn('public_reference', $data['references'])->whereNotNull('archived_at')->lockForUpdate()->get();
+            abort_if($orders->count() !== count($data['references']), 404);
+            $orders->each->update(['archived_at' => null]);
+
+            return $orders->count();
+        });
+
+        return response()->json(['data' => ['restored' => $restored]]);
+    }
+
+    public function bulkTransition(Request $request, TransitionOrderStatusAction $action): JsonResponse
+    {
+        $data = $request->validate(['references' => ['required', 'array', 'min:1', 'max:100'], 'references.*' => ['ulid', 'distinct'], 'to_status' => ['required', 'in:confirmee,annulee,livree,echec_livraison,retournee']]);
+        $actor = $request->user();
+        if ($actor === null) {
+            abort(401);
+        }
+        $orders = Order::query()->whereIn('public_reference', $data['references'])->whereNull('archived_at')->get();
+        if ($orders->count() !== count($data['references'])) {
+            abort(404);
+        }
+        foreach ($orders as $order) {
+            if (! in_array($data['to_status'], $this->transitions($order->status), true)) {
+                return response()->json(['code' => 'BULK_TRANSITION_NOT_ALLOWED', 'message' => 'Toutes les commandes sélectionnées doivent permettre cette transition.'], 422);
+            }
+        }
+        $updated = DB::transaction(function () use ($data, $action, $actor): int {
+            $orders = Order::query()->whereIn('public_reference', $data['references'])->whereNull('archived_at')->lockForUpdate()->get();
+            abort_if($orders->count() !== count($data['references']), 404);
+
+            foreach ($orders as $order) {
+                if (! in_array($data['to_status'], $this->transitions($order->status), true)) {
+                    throw ValidationException::withMessages(['to_status' => 'La transition groupée n’est plus autorisée. Actualisez la liste.']);
+                }
+            }
+
+            foreach ($orders as $order) {
+                $terminal = in_array($data['to_status'], ['annulee', 'echec_livraison', 'retournee'], true);
+                $action->handle($order, $data['to_status'], $terminal ? 'Action groupée opérateur' : null, $actor->id, $data['to_status'] === 'retournee');
+            }
+
+            return $orders->count();
+        });
+
+        return response()->json(['data' => ['updated' => $updated]]);
     }
 
     public function export(Request $request): StreamedResponse

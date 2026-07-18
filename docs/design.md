@@ -3737,9 +3737,20 @@ These rules apply to every current and future admin screen.
 
 ## Filters and selects
 
-- Use the shared `SelectControl` visual language for every dropdown: selected value, chevron, selected checkmark, keyboard focus, outside-click dismissal, and a touch-friendly mobile bottom sheet.
-- Do not create hover-only dropdowns or browser-dependent option styling for operational controls.
-- Keep the underlying form value synchronized with Vue bindings and preserve keyboard access.
+- Use the shared styled native `SelectControl` for every dropdown. It keeps reliable browser keyboard and touch behavior while providing one calm closed-control treatment, including label, chevron, focus ring, and touch-safe height.
+- Do not create custom listboxes, hover-only dropdowns, page-specific menus, or JavaScript option overlays for operational controls.
+- Keep the native value synchronized with Vue bindings. Filter changes apply immediately, while free-text filters use a 280 ms debounce.
+- Movement history supports product search, movement type, and inclusive start/end dates. Empty results say that no movement matches the current criteria.
+- Product lists show only the everyday controls by default: search, category, visibility, active/archive view, and sort. Stock state, product type, and promotion live behind `Plus de filtres`; opening it must not reset current filters.
+
+## Bulk operations and archives
+
+- Tables use a leading checkbox, a clear selected-count bar, and only actions that are valid for the entire current selection.
+- Products use a three-level lifecycle: `Publié` appears in the storefront, `Masqué` remains editable in the active catalogue but is absent from the storefront, and `Archivé` is removed from routine operations while preserving references. The Archives view offers `Restaurer`; restored products remain masked until deliberately published.
+- Permanent product deletion is available only from the Archives view and only where the selected products have no order-item or inventory-movement history. It is irreversible and must be confirmed explicitly. Historical products are archived, never force-deleted.
+- Orders can move only through their existing state machine. A bulk transition appears only when every selected order has that same legal next step; the server validates the whole selection before changing any order.
+- Order “deletion” is archival, never destructive deletion. Archived orders are hidden from the active list, remain available through the Archives filter, and remain viewable with their history intact.
+- Archive actions require an explicit consequence-aware confirmation. Success and ordinary updates use toasts; validation and authorization failures remain near their cause or in a page alert.
 
 ## Status and feedback
 

@@ -6,11 +6,14 @@ use App\Domain\Catalog\Actions\CreateProductAction;
 use App\Domain\Catalog\Actions\ReplaceProductVariantsAction;
 use App\Domain\Catalog\Actions\SwitchProductVariantModeAction;
 use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\InventoryMovement;
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Commerce\Models\OrderItem;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ProductController extends Controller
 {
@@ -23,6 +26,7 @@ class ProductController extends Controller
             'has_variants' => ['nullable', 'boolean'],
             'stock_state' => ['nullable', 'in:in_stock,low_stock,out_of_stock'],
             'is_promotional' => ['nullable', 'boolean'],
+            'archived' => ['nullable', 'boolean'],
             'created_from' => ['nullable', 'date'],
             'created_to' => ['nullable', 'date'],
             'sort' => ['nullable', 'in:name,-name,created_at,-created_at,regular_price_millimes,-regular_price_millimes'],
@@ -31,6 +35,8 @@ class ProductController extends Controller
         $query = Product::query()
             ->with(['category', 'images' => fn ($images) => $images->where('is_primary', true)->select(['id', 'product_id', 'path', 'processing_status', 'is_primary'])])
             ->withSum(['variants as active_variant_stock_quantity' => fn ($variants) => $variants->where('is_active', true)], 'stock_quantity');
+
+        ($data['archived'] ?? false) ? $query->onlyTrashed() : $query->whereNull('deleted_at');
 
         if ($data['search'] ?? null) {
             $query->where('name', 'like', '%'.$data['search'].'%');
@@ -126,6 +132,82 @@ class ProductController extends Controller
         $product->update(['is_active' => $data['is_active'], 'published_at' => $data['is_active'] ? ($product->published_at ?? now()) : $product->published_at]);
 
         return response()->json(['data' => $product->fresh()]);
+    }
+
+    public function bulkStatus(Request $request): JsonResponse
+    {
+        $data = $request->validate(['public_ids' => ['required', 'array', 'min:1', 'max:100'], 'public_ids.*' => ['ulid', 'distinct'], 'is_active' => ['required', 'boolean']]);
+        $updated = DB::transaction(function () use ($data): int {
+            $products = Product::query()->whereIn('public_id', $data['public_ids'])->lockForUpdate()->get();
+            abort_if($products->count() !== count($data['public_ids']), 404);
+
+            foreach ($products as $product) {
+                $product->update([
+                    'is_active' => $data['is_active'],
+                    'published_at' => $data['is_active'] ? ($product->published_at ?? now()) : $product->published_at,
+                ]);
+            }
+
+            return $products->count();
+        });
+
+        return response()->json(['data' => ['updated' => $updated]]);
+    }
+
+    public function bulkArchive(Request $request): JsonResponse
+    {
+        $data = $request->validate(['public_ids' => ['required', 'array', 'min:1', 'max:100'], 'public_ids.*' => ['ulid', 'distinct']]);
+        $archived = DB::transaction(function () use ($data): int {
+            $products = Product::query()->whereIn('public_id', $data['public_ids'])->lockForUpdate()->get();
+            abort_if($products->count() !== count($data['public_ids']), 404);
+
+            foreach ($products as $product) {
+                $product->update(['is_active' => false]);
+                $product->delete();
+            }
+
+            return $products->count();
+        });
+
+        return response()->json(['data' => ['archived' => $archived]]);
+    }
+
+    public function bulkRestore(Request $request): JsonResponse
+    {
+        $data = $request->validate(['public_ids' => ['required', 'array', 'min:1', 'max:100'], 'public_ids.*' => ['ulid', 'distinct']]);
+        $restored = DB::transaction(function () use ($data): int {
+            $products = Product::withTrashed()->onlyTrashed()->whereIn('public_id', $data['public_ids'])->lockForUpdate()->get();
+            abort_if($products->count() !== count($data['public_ids']), 404);
+
+            foreach ($products as $product) {
+                $product->restore();
+            }
+
+            return $products->count();
+        });
+
+        return response()->json(['data' => ['restored' => $restored]]);
+    }
+
+    public function bulkForceDelete(Request $request): JsonResponse
+    {
+        $data = $request->validate(['public_ids' => ['required', 'array', 'min:1', 'max:100'], 'public_ids.*' => ['ulid', 'distinct']]);
+        $deleted = DB::transaction(function () use ($data): int {
+            $products = Product::withTrashed()->onlyTrashed()->whereIn('public_id', $data['public_ids'])->lockForUpdate()->get();
+            abort_if($products->count() !== count($data['public_ids']), 404);
+            $productIds = $products->pluck('id');
+            if (OrderItem::query()->whereIn('product_id', $productIds)->exists() || InventoryMovement::query()->whereIn('product_id', $productIds)->exists()) {
+                throw ValidationException::withMessages(['public_ids' => 'Un produit sélectionné possède un historique de commande ou de stock. Archivez-le à la place.']);
+            }
+
+            foreach ($products as $product) {
+                $product->forceDelete();
+            }
+
+            return $products->count();
+        });
+
+        return response()->json(['data' => ['deleted' => $deleted]]);
     }
 
     public function variantMode(Request $request, Product $product, SwitchProductVariantModeAction $action): JsonResponse

@@ -10,6 +10,11 @@ class Order extends Model
 {
     protected $guarded = [];
 
+    protected function casts(): array
+    {
+        return ['archived_at' => 'datetime'];
+    }
+
     protected static function booted(): void
     {
         static::creating(function (self $order): void {

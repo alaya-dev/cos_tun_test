@@ -99,7 +99,7 @@ Work one PR-sized vertical slice at a time. Do not skip phase gates, invent feat
 
 ### Admin UI Consistency
 
-For back-office work, follow `docs/design.md` section 70. Reuse the shared admin select/listbox behavior instead of creating native-select styling or a page-specific dropdown. Keep mobile navigation sticky with visible section labels and no horizontal scrolling. Scope sidebar styles to the direct sidebar only, preserve reduced-motion behavior, and keep print styles limited to operational information.
+For back-office work, follow `docs/design.md` section 70. Use the shared styled native `SelectControl` for every dropdown: it must preserve browser keyboard and touch reliability, responsive sizing, and consistent closed-control treatment. Do not introduce custom hover menus or page-specific dropdowns. Keep mobile navigation sticky with visible section labels and no horizontal scrolling. Scope sidebar styles to the direct sidebar only, preserve reduced-motion behavior, and keep print styles limited to operational information.
 
 At completion, report:
 

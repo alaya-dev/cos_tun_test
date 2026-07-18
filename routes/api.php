@@ -27,6 +27,10 @@ Route::prefix('v1/admin')->middleware(['web', 'auth', 'can:catalog.manage'])->gr
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('products', ProductController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
     Route::post('products/{product}/status', [ProductController::class, 'status']);
+    Route::post('products/bulk-status', [ProductController::class, 'bulkStatus']);
+    Route::post('products/bulk-archive', [ProductController::class, 'bulkArchive']);
+    Route::post('products/bulk-restore', [ProductController::class, 'bulkRestore']);
+    Route::post('products/bulk-force-delete', [ProductController::class, 'bulkForceDelete']);
     Route::post('products/{product}/variant-mode', [ProductController::class, 'variantMode']);
     Route::put('products/{product}/variants', [ProductController::class, 'replaceVariants']);
     Route::post('products/{product}/images', [ProductImageController::class, 'store']);
@@ -42,4 +46,7 @@ Route::prefix('v1/admin')->middleware(['web', 'auth', 'can:catalog.manage'])->gr
     Route::put('orders/{order}/items', [OrderController::class, 'updateItems']);
     Route::post('orders/{order}/transitions', [OrderController::class, 'transition']);
     Route::post('orders/{order}/notes', [OrderController::class, 'storeNote']);
+    Route::post('orders/bulk-archive', [OrderController::class, 'bulkArchive']);
+    Route::post('orders/bulk-restore', [OrderController::class, 'bulkRestore']);
+    Route::post('orders/bulk-transition', [OrderController::class, 'bulkTransition']);
 });
