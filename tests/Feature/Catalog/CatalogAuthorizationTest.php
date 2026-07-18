@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Catalog;
 
+use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -45,5 +47,19 @@ class CatalogAuthorizationTest extends TestCase
 
         $this->actingAs($admin, 'sanctum')->getJson('/api/v1/admin/orders')->assertOk();
         $this->actingAs($admin, 'sanctum')->getJson('/api/v1/admin/inventory/movements')->assertOk();
+    }
+
+    public function test_hiding_a_category_hides_its_products(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage', 'is_active' => true]);
+        $product = Product::query()->create(['category_id' => $category->id, 'name' => 'Sérum', 'slug' => 'serum', 'regular_price_millimes' => 25_000, 'stock_quantity' => 5, 'is_active' => true]);
+
+        $this->actingAs($admin, 'sanctum')->patchJson('/api/v1/admin/categories/'.$category->public_id, [
+            'is_active' => false,
+        ])->assertOk();
+
+        $this->assertFalse($category->fresh()->is_active);
+        $this->assertFalse($product->fresh()->is_active);
     }
 }

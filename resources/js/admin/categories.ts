@@ -27,7 +27,7 @@ async function api<T>(
         credentials: 'same-origin',
         headers: {
             Accept: 'application/json',
-            ...(body === undefined
+            ...(method === 'GET'
                 ? {}
                 : {
                       'Content-Type': 'application/json',

@@ -46,7 +46,12 @@ class CategoryController extends Controller
     {
         $oldSlug = $category->slug;
         $data = $this->validated($request, false);
-        $category->update($data);
+        DB::transaction(function () use ($category, $data): void {
+            $category->update($data);
+            if (array_key_exists('is_active', $data) && ! $data['is_active']) {
+                $category->products()->update(['is_active' => false]);
+            }
+        });
         if (isset($data['slug']) && $data['slug'] !== $oldSlug) {
             DB::table('url_redirects')->updateOrInsert(['from_path' => '/categories/'.$oldSlug], ['to_path' => '/categories/'.$category->slug, 'updated_at' => now(), 'created_at' => now()]);
         }
