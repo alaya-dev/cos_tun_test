@@ -4,6 +4,7 @@ namespace Tests\Feature\Commerce;
 
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Commerce\Actions\ReconcileOrderItemsAction;
 use App\Domain\Commerce\Actions\TransitionOrderStatusAction;
 use App\Domain\Commerce\Actions\UpdateOrderCustomerAction;
 use App\Domain\Commerce\Models\Order;
@@ -65,6 +66,20 @@ class OrderTransitionTest extends TestCase
         } catch (ValidationException) {
             $this->assertSame('livree', $order->fresh()->status);
         }
+    }
+
+    public function test_item_reconciliation_restores_old_stock_and_deducts_new_stock(): void
+    {
+        [$order, $oldProduct] = $this->orderWithItem();
+        $category = $oldProduct->category;
+        $replacement = Product::query()->create(['category_id' => $category->id, 'name' => 'Baume', 'slug' => 'baume-'.str()->random(6), 'regular_price_millimes' => 20_000, 'stock_quantity' => 4, 'is_active' => true]);
+        $actor = User::factory()->create();
+        app(ReconcileOrderItemsAction::class)->handle($order, 1, [['product_public_id' => $replacement->public_id, 'variant_public_id' => null, 'quantity' => 2]], $actor->id);
+        $this->assertSame(3, $oldProduct->fresh()->stock_quantity);
+        $this->assertSame(2, $replacement->fresh()->stock_quantity);
+        $this->assertSame(40_000, $order->fresh()->total_millimes);
+        $this->assertDatabaseHas('inventory_movements', ['type' => 'order_edit_restore', 'product_id' => $oldProduct->id]);
+        $this->assertDatabaseHas('inventory_movements', ['type' => 'order_edit_deduction', 'product_id' => $replacement->id]);
     }
 
     /** @return array{Order, Product} */
