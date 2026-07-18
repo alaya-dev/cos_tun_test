@@ -7,6 +7,7 @@ use App\Domain\Commerce\Models\Order;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends Controller
 {
@@ -61,6 +62,34 @@ class OrderController extends Controller
         }
 
         return response()->json(['data' => $order->notes()->create(['user_id' => $actor->id, 'body' => $data['body'], 'created_at' => now()])], 201);
+    }
+
+    public function export(Request $request): StreamedResponse
+    {
+        $data = $request->validate(['status' => ['nullable', 'in:nouvelle,confirmee,annulee,livree,echec_livraison,retournee'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date']]);
+        $query = Order::query()->select(['public_reference', 'status', 'customer_name', 'customer_phone', 'customer_city', 'total_millimes', 'created_at'])->orderByDesc('created_at')->limit(10_000);
+        if ($data['status'] ?? null) {
+            $query->where('status', $data['status']);
+        }
+        if ($data['date_from'] ?? null) {
+            $query->whereDate('created_at', '>=', $data['date_from']);
+        }
+        if ($data['date_to'] ?? null) {
+            $query->whereDate('created_at', '<=', $data['date_to']);
+        }
+
+        return response()->streamDownload(function () use ($query): void {
+            $handle = fopen('php://output', 'wb');
+            if ($handle === false) {
+                return;
+            } fputcsv($handle, ['Référence', 'Statut', 'Client', 'Téléphone', 'Ville', 'Total millimes', 'Créée le']);
+            $query->chunkById(500, function ($orders) use ($handle): void {
+                foreach ($orders as $order) {
+                    fputcsv($handle, [$order->public_reference, $order->status, $order->customer_name, $order->customer_phone, $order->customer_city, $order->total_millimes, $order->created_at?->toIso8601String()]);
+                }
+            });
+            fclose($handle);
+        }, 'commandes.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 
     /** @return array<int, string> */
