@@ -8,7 +8,6 @@ use App\Domain\Commerce\Exceptions\CheckoutConflictException;
 use App\Domain\Commerce\Models\CheckoutField;
 use App\Domain\Commerce\Models\Order;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class CreateGuestOrderAction
 {
@@ -59,7 +58,7 @@ class CreateGuestOrderAction
                 $lines[] = compact('product', 'variant', 'regular', 'effective', 'item');
             }
             $shipping = (int) config('commerce.shipping_fixed_fee_millimes');
-            $order = Order::query()->create(['checkout_idempotency_key' => $idempotencyKey, 'status' => 'nouvelle', 'customer_name' => trim($data['customer']['full_name']), 'customer_phone' => $this->phone($data['customer']['phone']), 'customer_city' => trim($data['customer']['city']), 'customer_address' => trim($data['customer']['address']), 'subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'promo_code_discount_millimes' => 0, 'shipping_fee_millimes' => $shipping, 'total_millimes' => $subtotal + $shipping, 'meta_event_id' => 'purchase_'.Str::ulid()]);
+            $order = Order::query()->create(['checkout_idempotency_key' => $idempotencyKey, 'status' => 'nouvelle', 'customer_name' => trim($data['customer']['full_name']), 'customer_phone' => $this->phone($data['customer']['phone']), 'customer_city' => trim($data['customer']['city']), 'customer_address' => trim($data['customer']['address']), 'subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'promo_code_discount_millimes' => 0, 'shipping_fee_millimes' => $shipping, 'total_millimes' => $subtotal + $shipping]);
             foreach ($lines as $line) {
                 $product = $line['product'];
                 $variant = $line['variant'];

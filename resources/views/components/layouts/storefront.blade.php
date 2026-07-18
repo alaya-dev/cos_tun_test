@@ -20,7 +20,7 @@
         </nav>
         <div class="header-actions">
             <button class="icon-button" type="button" data-search-trigger aria-label="Rechercher"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="5.8"/><path d="m16 16 4.1 4.1"/></svg></button>
-            <span class="header-cart" aria-label="Panier bientôt disponible">Panier <span aria-hidden="true">0</span></span>
+            <a class="header-cart" href="{{ route('storefront.cart') }}" aria-label="Voir le panier">Panier <span data-cart-count aria-hidden="true">0</span></a>
         </div>
         <form class="global-search" action="{{ route('storefront.search') }}" role="search" data-global-search>
             <label class="sr-only" for="global-search-input">Rechercher un produit ou une catégorie</label>

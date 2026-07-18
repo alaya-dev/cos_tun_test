@@ -9,6 +9,7 @@ use Illuminate\Cache\RedisStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\URL;
 
 class GuestOrderController extends Controller
 {
@@ -36,6 +37,8 @@ class GuestOrderController extends Controller
         }
         $order = $result['order'];
 
-        return response()->json(['data' => ['order' => ['public_reference' => $order->public_reference, 'status' => $order->status, 'pricing' => ['total' => ['millimes' => $order->total_millimes]], 'payment_method' => 'cash_on_delivery'], 'meta' => ['browser_purchase_required' => false, 'event_id' => $order->meta_event_id]], 'meta' => ['request_id' => $request->attributes->get('request_id')]], $result['replayed'] ? 200 : 201);
+        $expiresAt = now()->addDays(7);
+
+        return response()->json(['data' => ['order' => ['public_reference' => $order->public_reference, 'status' => $order->status, 'pricing' => ['total' => ['millimes' => $order->total_millimes]], 'payment_method' => 'cash_on_delivery'], 'confirmation' => ['url' => URL::temporarySignedRoute('storefront.confirmation', $expiresAt, ['order' => $order]), 'expires_at' => $expiresAt->toIso8601String()], 'meta' => ['browser_purchase_required' => false, 'event_id' => $order->meta_event_id]], 'meta' => ['request_id' => $request->attributes->get('request_id')]], $result['replayed'] ? 200 : 201);
     }
 }

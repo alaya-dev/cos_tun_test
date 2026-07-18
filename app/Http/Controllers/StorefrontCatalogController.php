@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Services\CatalogCacheVersion;
+use App\Domain\Commerce\Models\Order;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -14,6 +15,21 @@ use Illuminate\Support\Facades\DB;
 
 class StorefrontCatalogController extends Controller
 {
+    public function cart(): View
+    {
+        return view('storefront.cart');
+    }
+
+    public function checkout(): View
+    {
+        return view('storefront.checkout');
+    }
+
+    public function confirmation(Order $order): View
+    {
+        return view('storefront.confirmation', compact('order'));
+    }
+
     public function home(): View
     {
         $version = app(CatalogCacheVersion::class)->current();
