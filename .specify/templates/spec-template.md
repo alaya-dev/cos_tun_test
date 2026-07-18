@@ -1,6 +1,7 @@
 # Feature Specification: [FEATURE NAME]
 
-**Feature Branch**: `[###-feature-name]`
+**Feature Branch**: `[###-feature-name]` (required: each specification MUST use its own new
+dedicated branch; do not share a branch with another specification)
 
 **Created**: [DATE]
 
