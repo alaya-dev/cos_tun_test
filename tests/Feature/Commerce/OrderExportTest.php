@@ -31,8 +31,11 @@ class OrderExportTest extends TestCase
 
         $response = $this->actingAs($admin, 'sanctum')->get('/api/v1/admin/orders/export');
 
-        $response->assertOk()->assertHeader('Cache-Control', 'private, no-store');
-        $this->assertStringContainsString($order->public_reference, $response->streamedContent());
-        $this->assertStringNotContainsString('Adresse privée', $response->streamedContent());
+        $response->assertOk();
+        $this->assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $csv = $response->streamedContent();
+        $this->assertStringContainsString($order->public_reference, $csv);
+        $this->assertStringNotContainsString('Adresse privée', $csv);
     }
 }
