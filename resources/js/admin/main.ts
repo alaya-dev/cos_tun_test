@@ -3,6 +3,7 @@ import { createPinia } from 'pinia';
 import { createRouter, createWebHistory, RouterLink, RouterView, useRoute, useRouter } from 'vue-router';
 import OrderDetailView from './order-detail';
 import OrdersView from './orders';
+import ProductsView from './products';
 
 type Page<T> = { data: T[]; current_page: number; last_page: number };
 type Category = { public_id: string; name: string; slug: string; description?: string | null; is_active: boolean; sort_order: number; seo_title?: string | null; seo_description?: string | null };
@@ -200,5 +201,5 @@ const Categories = { setup() { const state = collection<Category>('categories?pe
 
 const Shell = { components: { RouterLink, RouterView }, template: '<div class="admin-shell"><aside><a class="admin-brand" href="/admin">PASSION<br><small>COSMETIC · ADMIN</small></a><nav><RouterLink to="/products">Produits</RouterLink><RouterLink to="/categories">Catégories</RouterLink><RouterLink to="/orders">Commandes</RouterLink><RouterLink to="/inventory">Stock</RouterLink></nav></aside><main><RouterView /></main></div>' };
 
-const router = createRouter({ history: createWebHistory('/admin'), routes: [{ path: '/', redirect: '/products' }, { path: '/products', component: Products }, { path: '/products/:reference', component: ProductEditor }, { path: '/categories', component: Categories }, { path: '/orders', component: OrdersView }, { path: '/orders/:reference', component: OrderDetailView }, { path: '/inventory', component: Inventory }] });
+const router = createRouter({ history: createWebHistory('/admin'), routes: [{ path: '/', redirect: '/products' }, { path: '/products', component: ProductsView }, { path: '/products/new', component: Products }, { path: '/products/:reference', component: ProductEditor }, { path: '/categories', component: Categories }, { path: '/orders', component: OrdersView }, { path: '/orders/:reference', component: OrderDetailView }, { path: '/inventory', component: Inventory }] });
 createApp(Shell).use(createPinia()).use(router).mount('#admin-app');

@@ -28,7 +28,7 @@ class ProductController extends Controller
             'sort' => ['nullable', 'in:name,-name,created_at,-created_at,regular_price_millimes,-regular_price_millimes'],
             'per_page' => ['nullable', 'integer', 'between:1,100'],
         ]);
-        $query = Product::query()->with('category');
+        $query = Product::query()->with(['category', 'images' => fn ($images) => $images->where('is_primary', true)->select(['id', 'product_id', 'path', 'processing_status', 'is_primary'])]);
 
         if ($data['search'] ?? null) {
             $query->where('name', 'like', '%'.$data['search'].'%');
