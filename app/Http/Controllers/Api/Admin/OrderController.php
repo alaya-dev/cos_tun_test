@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Domain\Commerce\Actions\ReconcileOrderItemsAction;
 use App\Domain\Commerce\Actions\TransitionOrderStatusAction;
 use App\Domain\Commerce\Actions\UpdateOrderCustomerAction;
 use App\Domain\Commerce\Models\Order;
@@ -62,6 +63,20 @@ class OrderController extends Controller
             return response()->json(['data' => $action->handle($order, $data['lock_version'], $data['customer'])]);
         } catch (ValidationException $exception) {
             return response()->json(['code' => $exception->errors()['lock_version'] ?? $exception->errors()['order'] ?? 'ORDER_NOT_EDITABLE', 'message' => $exception->getMessage()], 409);
+        }
+    }
+
+    public function updateItems(Request $request, Order $order, ReconcileOrderItemsAction $action): JsonResponse
+    {
+        $data = $request->validate(['lock_version' => ['required', 'integer', 'min:1'], 'items' => ['required', 'array', 'min:1', 'max:100'], 'items.*.product_public_id' => ['required', 'ulid'], 'items.*.variant_public_id' => ['nullable', 'ulid'], 'items.*.quantity' => ['required', 'integer', 'between:1,99']]);
+        $actor = $request->user();
+        if ($actor === null) {
+            abort(401);
+        }
+        try {
+            return response()->json(['data' => $action->handle($order, $data['lock_version'], $data['items'], $actor->id)]);
+        } catch (ValidationException $exception) {
+            return response()->json(['code' => 'ORDER_UPDATE_CONFLICT', 'message' => $exception->getMessage()], 409);
         }
     }
 
