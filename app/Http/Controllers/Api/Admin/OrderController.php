@@ -62,7 +62,10 @@ class OrderController extends Controller
         try {
             return response()->json(['data' => $action->handle($order, $data['lock_version'], $data['customer'])]);
         } catch (ValidationException $exception) {
-            return response()->json(['code' => $exception->errors()['lock_version'] ?? $exception->errors()['order'] ?? 'ORDER_NOT_EDITABLE', 'message' => $exception->getMessage()], 409);
+            $errors = $exception->errors();
+            $message = collect($errors)->flatten()->first() ?? 'La commande ne peut pas Ãªtre modifiÃ©e.';
+
+            return response()->json(['code' => array_key_exists('lock_version', $errors) ? 'ORDER_VERSION_CONFLICT' : 'ORDER_NOT_EDITABLE', 'message' => $message], 409);
         }
     }
 

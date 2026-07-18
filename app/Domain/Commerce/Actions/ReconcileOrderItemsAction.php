@@ -22,11 +22,29 @@ class ReconcileOrderItemsAction
             if ($order->lock_version !== $lockVersion) {
                 throw ValidationException::withMessages(['lock_version' => 'La commande a été modifiée.']);
             }
-            $ids = array_unique(array_merge(array_column($items, 'product_public_id'), $order->items->pluck('product_id')->map(fn (int $id) => Product::query()->find($id)?->public_id)->filter()->all()));
-            sort($ids);
-            $products = Product::query()->with(['variants.values.productOptionGroup'])->whereIn('public_id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('public_id');
+            $productPublicIds = array_unique(array_column($items, 'product_public_id'));
+            sort($productPublicIds);
+            $oldProductIds = $order->items->pluck('product_id')->filter()->unique()->sort()->values()->all();
+            $lockedProducts = Product::query()
+                ->where(function ($query) use ($productPublicIds, $oldProductIds): void {
+                    $query->whereIn('public_id', $productPublicIds)
+                        ->orWhereIn('id', $oldProductIds);
+                })
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $productsByPublicId = $lockedProducts->keyBy('public_id');
+            $productsById = $lockedProducts->keyBy('id');
+            $variants = ProductVariant::query()
+                ->with('values.productOptionGroup')
+                ->whereIn('product_id', $lockedProducts->pluck('id'))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $variantsById = $variants->keyBy('id');
+            $variantsByPublicId = $variants->keyBy('public_id');
             foreach ($order->items as $old) {
-                $target = $old->product_variant_id ? ProductVariant::query()->whereKey($old->product_variant_id)->lockForUpdate()->first() : Product::query()->whereKey($old->product_id)->lockForUpdate()->first();
+                $target = $old->product_variant_id ? $variantsById->get($old->product_variant_id) : $productsById->get($old->product_id);
                 if ($target) {
                     $before = $target->stock_quantity;
                     $target->increment('stock_quantity', $old->quantity);
@@ -37,10 +55,14 @@ class ReconcileOrderItemsAction
             $subtotal = 0;
             $discount = 0;
             foreach ($items as $line) {
-                $product = $products->get($line['product_public_id']);
+                $product = $productsByPublicId->get($line['product_public_id']);
                 if (! $product || ! $product->is_active) {
                     throw ValidationException::withMessages(['items' => 'Produit indisponible.']);
-                } $variant = $line['variant_public_id'] ? $product->variants->firstWhere('public_id', $line['variant_public_id']) : null;
+                }
+                $variant = $line['variant_public_id'] ? $variantsByPublicId->get($line['variant_public_id']) : null;
+                if ($variant && $variant->product_id !== $product->id) {
+                    throw ValidationException::withMessages(['items' => 'Variante invalide pour ce produit.']);
+                }
                 $target = $variant ?? $product;
                 if ($product->has_variants !== ($variant !== null) || ! $target->is_active || ($target->stock_quantity ?? 0) < $line['quantity']) {
                     throw ValidationException::withMessages(['items' => 'Stock insuffisant ou variante invalide.']);

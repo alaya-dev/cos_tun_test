@@ -82,6 +82,20 @@ class OrderTransitionTest extends TestCase
         $this->assertDatabaseHas('inventory_movements', ['type' => 'order_edit_deduction', 'product_id' => $replacement->id]);
     }
 
+    public function test_item_reconciliation_locks_and_uses_the_selected_variant(): void
+    {
+        [$order, $oldProduct] = $this->orderWithItem();
+        $replacement = Product::query()->create(['category_id' => $oldProduct->category_id, 'name' => 'Gel avec teinte', 'slug' => 'gel-'.str()->random(6), 'regular_price_millimes' => 15_000, 'stock_quantity' => 0, 'has_variants' => true, 'is_active' => true]);
+        $variant = $replacement->variants()->create(['sku' => 'GEL-NUDE', 'combination_key' => 'nude', 'stock_quantity' => 3, 'is_active' => true]);
+        $actor = User::factory()->create();
+
+        app(ReconcileOrderItemsAction::class)->handle($order, 1, [['product_public_id' => $replacement->public_id, 'variant_public_id' => $variant->public_id, 'quantity' => 2]], $actor->id);
+
+        $this->assertSame(3, $oldProduct->fresh()->stock_quantity);
+        $this->assertSame(1, $variant->fresh()->stock_quantity);
+        $this->assertDatabaseHas('inventory_movements', ['type' => 'order_edit_deduction', 'product_variant_id' => $variant->id, 'quantity_after' => 1]);
+    }
+
     /** @return array{Order, Product} */
     private function orderWithItem(): array
     {
