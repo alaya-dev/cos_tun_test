@@ -97,7 +97,7 @@ class OrderController extends Controller
     public function export(Request $request): StreamedResponse
     {
         $data = $request->validate(['status' => ['nullable', 'in:nouvelle,confirmee,annulee,livree,echec_livraison,retournee'], 'date_from' => ['nullable', 'date'], 'date_to' => ['nullable', 'date']]);
-        $query = Order::query()->select(['public_reference', 'status', 'customer_name', 'customer_phone', 'customer_city', 'total_millimes', 'created_at'])->orderByDesc('created_at')->limit(10_000);
+        $query = Order::query()->select(['id', 'public_reference', 'status', 'customer_name', 'customer_phone', 'customer_city', 'total_millimes', 'created_at'])->orderByDesc('created_at')->limit(10_000);
         if ($data['status'] ?? null) {
             $query->where('status', $data['status']);
         }
