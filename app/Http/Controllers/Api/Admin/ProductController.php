@@ -82,7 +82,10 @@ class ProductController extends Controller
 
     public function update(Request $request, Product $product): JsonResponse
     {
-        $data = $request->validate(['category_public_id' => ['sometimes', 'ulid'], 'name' => ['sometimes', 'string', 'max:200'], 'slug' => ['sometimes', 'string', 'max:190', 'unique:products,slug,'.$product->id], 'short_description' => ['nullable', 'string'], 'full_description' => ['nullable', 'string'], 'regular_price_millimes' => ['sometimes', 'integer', 'min:0'], 'promotional_price_millimes' => ['nullable', 'integer', 'min:0'], 'is_active' => ['sometimes', 'boolean'], 'published_at' => ['nullable', 'date'], 'seo_title' => ['nullable', 'string', 'max:255'], 'seo_description' => ['nullable', 'string', 'max:320']]);
+        $data = $request->validate(['category_public_id' => ['sometimes', 'ulid'], 'name' => ['sometimes', 'string', 'max:200'], 'slug' => ['sometimes', 'string', 'max:190', 'unique:products,slug,'.$product->id], 'short_description' => ['nullable', 'string'], 'full_description' => ['nullable', 'string'], 'regular_price_millimes' => ['sometimes', 'integer', 'min:0'], 'promotional_price_millimes' => ['nullable', 'integer', 'min:0'], 'stock_quantity' => ['nullable', 'integer', 'min:0'], 'low_stock_threshold' => ['nullable', 'integer', 'min:0'], 'is_active' => ['sometimes', 'boolean'], 'published_at' => ['nullable', 'date'], 'seo_title' => ['nullable', 'string', 'max:255'], 'seo_description' => ['nullable', 'string', 'max:320']]);
+        if ($product->has_variants && (array_key_exists('stock_quantity', $data) || array_key_exists('low_stock_threshold', $data))) {
+            return response()->json(['code' => 'VARIANT_STOCK_MANAGED_SEPARATELY', 'message' => 'Le stock d’un produit à variantes se gère par variante.'], 422);
+        }
         if (isset($data['category_public_id'])) {
             $data['category_id'] = Category::query()->where('public_id', $data['category_public_id'])->firstOrFail()->id;
             unset($data['category_public_id']);
