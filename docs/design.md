@@ -3721,3 +3721,33 @@ Passion Cosmetic combines:
 The storefront should feel like a premium editorial beauty boutique.
 
 The back office should feel like the same brand translated into a clear, secure, efficient operational tool.
+
+---
+
+# 70. Back-Office UI Conventions
+
+These rules apply to every current and future admin screen.
+
+## Navigation and layout
+
+- Desktop uses a full-height, visually continuous sidebar with bottom-aligned account actions.
+- Mobile uses a sticky two-row navigation bar. All four section labels remain visible; it must not require horizontal scrolling.
+- Main content and side panels must never inherit sidebar layout styles. Scope sidebar CSS to the direct sidebar element only.
+- Prevent horizontal page overflow at mobile widths.
+
+## Filters and selects
+
+- Use the shared `SelectControl` visual language for every dropdown: selected value, chevron, selected checkmark, keyboard focus, outside-click dismissal, and a touch-friendly mobile bottom sheet.
+- Do not create hover-only dropdowns or browser-dependent option styling for operational controls.
+- Keep the underlying form value synchronized with Vue bindings and preserve keyboard access.
+
+## Status and feedback
+
+- Use semantic status colors consistently. Low stock and stock-out alerts are red and include a non-color warning marker.
+- Status changes must use task-oriented labels and state the operational consequence, not expose raw enum names.
+- Toasts sit above the mobile safe area and never inherit sidebar styling.
+
+## Print and motion
+
+- Order print output contains order information only. Hide navigation, buttons, controls, edit forms, filters, dialogs, toasts, and quick actions.
+- Use only opacity and transform for UI motion, normally 150–220ms, with reduced-motion support.

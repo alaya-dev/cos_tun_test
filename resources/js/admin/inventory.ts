@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, type Component } from 'vue';
+import { computed, onMounted, onUpdated, ref, type Component } from 'vue';
 import { showError, showToast } from './feedback';
 
 type Product = {
@@ -220,7 +220,13 @@ const InventoryView: Component = {
                           product.low_stock_threshold
                     ? 'Stock faible'
                     : 'En stock';
+        const highlightLowStock = () => {
+            document.querySelectorAll<HTMLElement>('.inventory-table .admin-badge').forEach((badge) => {
+                badge.classList.toggle('is-low-stock', badge.textContent?.trim() === 'Stock faible');
+            });
+        };
         onMounted(load);
+        onUpdated(highlightLowStock);
         return {
             tab,
             products,

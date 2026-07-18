@@ -1,6 +1,7 @@
 import { onMounted, ref, type Component } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { showError, showToast } from './feedback';
+import SelectControl from './select-control';
 
 type Category = { public_id: string; name: string };
 type Product = {
@@ -39,7 +40,7 @@ async function api<T>(path: string): Promise<T> {
 }
 
 const ProductsView: Component = {
-    components: { RouterLink },
+    components: { RouterLink, SelectControl },
     setup() {
         const route = useRoute();
         const page = ref<Page<Product> | null>(null);
@@ -64,7 +65,15 @@ const ProductsView: Component = {
                     sort: filters.value.sort,
                 });
                 Object.entries(filters.value).forEach(([key, value]) => {
-                    if (value && key !== 'sort') query.set(key, value);
+                    if (!value || key === 'sort') return;
+                    query.set(
+                        key,
+                        ['is_active', 'has_variants', 'is_promotional'].includes(key)
+                            ? value === 'true'
+                                ? '1'
+                                : '0'
+                            : value,
+                    );
                 });
                 page.value = (
                     await api<{ data: Page<Product> }>(`products?${query}`)
@@ -133,7 +142,7 @@ const ProductsView: Component = {
         };
     },
     template:
-        '<section class="admin-page"><header><div><p class="admin-eyebrow">Catalogue / Produits</p><h1>Produits</h1><p class="admin-subtitle">Gérez les produits, prix, variantes et disponibilité.</p></div><RouterLink class="admin-action" to="/products/new">Nouveau produit</RouterLink></header><div class="admin-filter-bar"><label class="admin-search"><span class="sr-only">Rechercher</span><input v-model.trim="filters.search" @input="queueSearch" placeholder="Rechercher un produit…"></label><select v-model="filters.category_id" @change="load()"><option value="">Catégorie</option><option v-for="category in categories" :key="category.public_id" :value="category.public_id">{{ category.name }}</option></select><select v-model="filters.is_active" @change="load()"><option value="">Publication</option><option value="true">Publié</option><option value="false">Brouillon</option></select><select v-model="filters.has_variants" @change="load()"><option value="">Type</option><option value="false">Stock unique</option><option value="true">Variantes</option></select><select v-model="filters.stock_state" @change="load()"><option value="">Stock</option><option value="in_stock">En stock</option><option value="low_stock">Stock faible</option><option value="out_of_stock">Rupture</option></select><select v-model="filters.is_promotional" @change="load()"><option value="">Promotion</option><option value="true">En promotion</option><option value="false">Sans promotion</option></select><select v-model="filters.sort" @change="load()"><option value="-created_at">Plus récents</option><option value="name">Nom A-Z</option><option value="regular_price_millimes">Prix croissant</option></select><button class="text-link" type="button" @click="reset">Réinitialiser</button></div><p v-if="loading" class="admin-loading">Chargement des produits…</p><p v-else-if="error" class="admin-alert" role="alert">{{ error }}</p><p v-else-if="!page?.data.length" class="admin-empty">Aucun produit ne correspond à ces critères. Modifiez les filtres ou créez un produit.</p><template v-else><p class="admin-result-count">{{ page.total }} résultat(s)</p><div class="admin-table admin-product-table"><div class="admin-table-head"><span>Produit</span><span>Prix</span><span>Stock</span><span>Statut</span></div><RouterLink v-for="product in page.data" :key="product.public_id" :to="\'/products/\' + product.public_id"><article><div class="admin-product-identity"><span class="admin-product-thumb"><img v-if="imageUrl(product)" :src="imageUrl(product)" alt=""><small v-else>Sans image</small></span><span><strong>{{ product.name }}</strong><small>{{ product.category?.name || \'Sans catégorie\' }} · {{ product.has_variants ? \'Variantes\' : \'Stock unique\' }}</small></span></div><span>{{ money(product.regular_price_millimes) }}</span><span>{{ stock(product) }} unités</span><span :class="product.is_active ? \'admin-badge is-published\' : \'admin-badge\'">{{ product.is_active ? \'Publié\' : \'Brouillon\' }}</span></article></RouterLink></div><nav v-if="page.last_page > 1" class="admin-pagination" aria-label="Pagination des produits"><button class="text-link" :disabled="page.current_page === 1" @click="load(page.current_page - 1)">Précédente</button><span>Page {{ page.current_page }} / {{ page.last_page }}</span><button class="text-link" :disabled="page.current_page === page.last_page" @click="load(page.current_page + 1)">Suivante</button></nav></template></section>',
+        '<section class="admin-page"><header><div><p class="admin-eyebrow">Catalogue / Produits</p><h1>Produits</h1><p class="admin-subtitle">Gérez les produits, prix, variantes et disponibilité.</p></div><RouterLink class="admin-action" to="/products/new">Nouveau produit</RouterLink></header><div class="admin-filter-bar"><label class="admin-search"><span class="sr-only">Rechercher</span><input v-model.trim="filters.search" @input="queueSearch" placeholder="Rechercher un produit…"></label><SelectControl v-model="filters.category_id" :options="[{ value: \'\', label: \'Catégorie\' }, ...categories.map(category => ({ value: category.public_id, label: category.name }))]" @change="load()"/><SelectControl v-model="filters.is_active" :options="[{ value: \'\', label: \'Publication\' }, { value: \'true\', label: \'Publié\' }, { value: \'false\', label: \'Brouillon\' }]" @change="load()"/><SelectControl v-model="filters.has_variants" :options="[{ value: \'\', label: \'Type\' }, { value: \'false\', label: \'Stock unique\' }, { value: \'true\', label: \'Variantes\' }]" @change="load()"/><SelectControl v-model="filters.stock_state" :options="[{ value: \'\', label: \'Stock\' }, { value: \'in_stock\', label: \'En stock\' }, { value: \'low_stock\', label: \'Stock faible\' }, { value: \'out_of_stock\', label: \'Rupture\' }]" @change="load()"/><SelectControl v-model="filters.is_promotional" :options="[{ value: \'\', label: \'Promotion\' }, { value: \'true\', label: \'En promotion\' }, { value: \'false\', label: \'Sans promotion\' }]" @change="load()"/><SelectControl v-model="filters.sort" :options="[{ value: \'-created_at\', label: \'Plus récents\' }, { value: \'name\', label: \'Nom A-Z\' }, { value: \'regular_price_millimes\', label: \'Prix croissant\' }]" @change="load()"/><button class="text-link" type="button" @click="reset">Réinitialiser</button></div><p v-if="loading" class="admin-loading">Chargement des produits…</p><p v-else-if="error" class="admin-alert" role="alert">{{ error }}</p><p v-else-if="!page?.data.length" class="admin-empty">Aucun produit ne correspond à ces critères. Modifiez les filtres ou créez un produit.</p><template v-else><p class="admin-result-count">{{ page.total }} résultat(s)</p><div class="admin-table admin-product-table"><div class="admin-table-head"><span>Produit</span><span>Prix</span><span>Stock</span><span>Statut</span></div><RouterLink v-for="product in page.data" :key="product.public_id" :to="\'/products/\' + product.public_id"><article><div class="admin-product-identity"><span class="admin-product-thumb"><img v-if="imageUrl(product)" :src="imageUrl(product)" alt=""><small v-else>Sans image</small></span><span><strong>{{ product.name }}</strong><small>{{ product.category?.name || \'Sans catégorie\' }} · {{ product.has_variants ? \'Variantes\' : \'Stock unique\' }}</small></span></div><span>{{ money(product.regular_price_millimes) }}</span><span>{{ stock(product) }} unités</span><span :class="product.is_active ? \'admin-badge is-published\' : \'admin-badge\'">{{ product.is_active ? \'Publié\' : \'Brouillon\' }}</span></article></RouterLink></div><nav v-if="page.last_page > 1" class="admin-pagination" aria-label="Pagination des produits"><button class="text-link" :disabled="page.current_page === 1" @click="load(page.current_page - 1)">Précédente</button><span>Page {{ page.current_page }} / {{ page.last_page }}</span><button class="text-link" :disabled="page.current_page === page.last_page" @click="load(page.current_page + 1)">Suivante</button></nav></template></section>',
 };
 
 export default ProductsView;

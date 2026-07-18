@@ -69,7 +69,8 @@ const CategoriesView: Component = {
             try {
                 const query = new URLSearchParams({ per_page: '100' });
                 if (search.value) query.set('search', search.value);
-                if (active.value) query.set('is_active', active.value);
+                if (active.value)
+                    query.set('is_active', active.value === 'true' ? '1' : '0');
                 rows.value = (
                     await api<{ data: Page<Category> }>(`categories?${query}`)
                 ).data.data;

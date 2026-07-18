@@ -1,6 +1,7 @@
 import { computed, onMounted, ref, type Component } from 'vue';
 import { RouterLink } from 'vue-router';
 import { showError, showToast } from './feedback';
+import SelectControl from './select-control';
 
 type Order = {
     public_reference: string;
@@ -54,7 +55,7 @@ async function api<T>(path: string): Promise<T> {
 }
 
 const OrdersView: Component = {
-    components: { RouterLink },
+    components: { RouterLink, SelectControl },
     setup() {
         const page = ref<Page<Order> | null>(null);
         const loading = ref(true);
@@ -152,8 +153,8 @@ const OrdersView: Component = {
 
       <section class="orders-filter-card" aria-label="Filtres des commandes">
         <label class="orders-search"><span class="sr-only">Rechercher une commande</span><span aria-hidden="true">⌕</span><input v-model.trim="filters.search" @input="search" placeholder="Référence, client ou téléphone…"></label>
-        <label class="toolbar-select"><span>Statut</span><select v-model="filters.status" @change="load()"><option value="">Tous les statuts</option><option value="nouvelle">Nouvelles</option><option value="confirmee">Confirmées</option><option value="livree">Livrées</option><option value="echec_livraison">Incidents</option><option value="annulee">Annulées</option><option value="retournee">Retournées</option></select></label>
-        <label class="toolbar-select"><span>Trier par</span><select v-model="filters.sort" @change="load()"><option value="-created_at">Plus récentes</option><option value="created_at">Plus anciennes</option><option value="-total_millimes">Total décroissant</option><option value="total_millimes">Total croissant</option></select></label>
+        <label class="toolbar-select"><span>Statut</span><SelectControl v-model="filters.status" :options="[{ value: '', label: 'Tous les statuts' }, { value: 'nouvelle', label: 'Nouvelles' }, { value: 'confirmee', label: 'Confirmées' }, { value: 'livree', label: 'Livrées' }, { value: 'echec_livraison', label: 'Incidents' }, { value: 'annulee', label: 'Annulées' }, { value: 'retournee', label: 'Retournées' }]" @change="load()"/></label>
+        <label class="toolbar-select"><span>Trier par</span><SelectControl v-model="filters.sort" :options="[{ value: '-created_at', label: 'Plus récentes' }, { value: 'created_at', label: 'Plus anciennes' }, { value: '-total_millimes', label: 'Total décroissant' }, { value: 'total_millimes', label: 'Total croissant' }]" @change="load()"/></label>
         <button class="admin-outline orders-more" type="button" :aria-expanded="extra" @click="extra = !extra">⌄ {{ extra ? 'Moins de filtres' : 'Plus de filtres' }}</button>
         <button class="text-link orders-reset" type="button" @click="reset">Réinitialiser</button>
         <Transition name="orders-filter"><div v-if="extra" class="orders-extra"><label>Du<input v-model="filters.date_from" type="date" @change="load()"></label><label>Au<input v-model="filters.date_to" type="date" @change="load()"></label><label>Total minimum (DT)<input v-model="filters.min_total_dt" inputmode="decimal" @change="load()"></label><label>Total maximum (DT)<input v-model="filters.max_total_dt" inputmode="decimal" @change="load()"></label></div></Transition>

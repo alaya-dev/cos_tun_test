@@ -97,6 +97,10 @@ Prefer server-rendered storefront pages, small lazy-loaded Vue islands, optimize
 
 Work one PR-sized vertical slice at a time. Do not skip phase gates, invent features, weaken authorization, trust browser totals, expose secrets, add real-time infrastructure, or introduce deployment-specific domain logic.
 
+### Admin UI Consistency
+
+For back-office work, follow `docs/design.md` section 70. Reuse the shared admin select/listbox behavior instead of creating native-select styling or a page-specific dropdown. Keep mobile navigation sticky with visible section labels and no horizontal scrolling. Scope sidebar styles to the direct sidebar only, preserve reduced-motion behavior, and keep print styles limited to operational information.
+
 At completion, report:
 
 - Files changed
