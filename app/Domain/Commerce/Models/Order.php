@@ -36,6 +36,12 @@ class Order extends Model
         return $this->hasMany(OrderStatusHistory::class);
     }
 
+    /** @return HasMany<OrderNote, $this> */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(OrderNote::class);
+    }
+
     public function getRouteKeyName(): string
     {
         return 'public_reference';

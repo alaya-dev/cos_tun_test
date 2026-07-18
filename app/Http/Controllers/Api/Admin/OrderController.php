@@ -32,7 +32,7 @@ class OrderController extends Controller
 
     public function show(Order $order): JsonResponse
     {
-        $order->load(['items', 'checkoutValues', 'statusHistory']);
+        $order->load(['items', 'checkoutValues', 'statusHistory', 'notes']);
 
         return response()->json(['data' => ['order' => $order, 'is_editable' => in_array($order->status, ['nouvelle', 'confirmee'], true), 'allowed_transitions' => $this->transitions($order->status), 'meta_purchase' => ['event_id' => $order->meta_event_id, 'status' => 'not_configured']]]);
     }
@@ -50,6 +50,17 @@ class OrderController extends Controller
         }
 
         return response()->json(['data' => $action->handle($order, $data['to_status'], $data['reason'] ?? null, $actor->id, $data['restock_items'] ?? false)]);
+    }
+
+    public function storeNote(Request $request, Order $order): JsonResponse
+    {
+        $data = $request->validate(['body' => ['required', 'string', 'between:1,5000']]);
+        $actor = $request->user();
+        if ($actor === null) {
+            abort(401);
+        }
+
+        return response()->json(['data' => $order->notes()->create(['user_id' => $actor->id, 'body' => $data['body'], 'created_at' => now()])], 201);
     }
 
     /** @return array<int, string> */
