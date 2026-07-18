@@ -78,15 +78,14 @@ Security, privacy, and performance are release requirements. Follow `docs/securi
 
 ### Milestone Branch Workflow
 
-Implement all phases belonging to one documented milestone on one dedicated branch. Start the next milestone from the current `main` only after the previous milestone has been confirmed and merged.
+Implement all phases belonging to one documented milestone on one dedicated branch. Start the next milestone from the current `main` only after the previous milestone has been merged. The contributor runs the verification suite; the owner performs the milestone merge.
 
 ```text
-milestone/01-foundation
-milestone/02-catalog-storefront
+milestone/03-commerce-core
 fix/meta-event-deduplication
 ```
 
-Keep each milestone branch focused. Do not merge a milestone into `main` without explicit confirmation that its phases' acceptance criteria, tests, security review, and performance checks pass. Use a separate `fix/*` branch for scoped corrections.
+Keep each milestone branch focused. Do not merge a milestone into `main` without explicit confirmation that its phases' acceptance criteria, tests, security review, performance checks, and documentation updates pass. Use a separate `fix/*` branch only for an isolated correction that cannot safely remain on the milestone branch.
 
 ### Meta Pixel Reliability
 
