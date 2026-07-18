@@ -17,3 +17,4 @@ Route::get('/admin/login', [AdminAuthController::class, 'create'])->name('login'
 Route::post('/admin/login', [AdminAuthController::class, 'store'])->middleware('throttle:5,1')->name('admin.login');
 Route::post('/admin/logout', [AdminAuthController::class, 'destroy'])->middleware('auth')->name('admin.logout');
 Route::view('/admin', 'admin.app')->middleware('auth')->name('admin.app');
+Route::view('/admin/{path}', 'admin.app')->where('path', '.*')->middleware('auth')->name('admin.spa');
