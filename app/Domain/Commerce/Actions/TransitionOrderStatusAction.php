@@ -22,8 +22,9 @@ class TransitionOrderStatusAction
             if (in_array($toStatus, ['annulee', 'echec_livraison', 'retournee'], true) && ! $reason) {
                 throw ValidationException::withMessages(['reason' => 'Un motif est requis pour cette transition.']);
             }
+            $fromStatus = $order->status;
             $order->update(['status' => $toStatus, 'lock_version' => $order->lock_version + 1]);
-            DB::table('order_status_history')->insert(['order_id' => $order->id, 'from_status' => $order->getOriginal('status'), 'to_status' => $toStatus, 'reason' => $reason, 'changed_by' => $actorId, 'created_at' => now()]);
+            DB::table('order_status_history')->insert(['order_id' => $order->id, 'from_status' => $fromStatus, 'to_status' => $toStatus, 'reason' => $reason, 'changed_by' => $actorId, 'created_at' => now()]);
             if (in_array($toStatus, ['annulee', 'echec_livraison'], true) || ($toStatus === 'retournee' && $restockReturn)) {
                 $this->restoreStockOnce($order, $actorId, $toStatus);
             }
