@@ -30,6 +30,12 @@ class Order extends Model
         return $this->hasMany(OrderCheckoutValue::class);
     }
 
+    /** @return HasMany<OrderStatusHistory, $this> */
+    public function statusHistory(): HasMany
+    {
+        return $this->hasMany(OrderStatusHistory::class);
+    }
+
     public function getRouteKeyName(): string
     {
         return 'public_reference';
