@@ -5,6 +5,7 @@ namespace Tests\Feature\Commerce;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Commerce\Actions\TransitionOrderStatusAction;
+use App\Domain\Commerce\Actions\UpdateOrderCustomerAction;
 use App\Domain\Commerce\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,6 +44,27 @@ class OrderTransitionTest extends TestCase
         }
         $this->assertSame('nouvelle', $order->fresh()->status);
         $this->assertSame(2, $product->fresh()->stock_quantity);
+    }
+
+    public function test_customer_update_rejects_stale_version_and_terminal_orders(): void
+    {
+        [$order] = $this->orderWithItem();
+        $action = app(UpdateOrderCustomerAction::class);
+        $customer = ['full_name' => 'Client Modifié', 'phone' => '22 987 654', 'city' => 'Ariana', 'address' => 'Nouvelle rue'];
+        $action->handle($order, 1, $customer);
+        $this->assertSame('Client Modifié', $order->fresh()->customer_name);
+        try {
+            $action->handle($order->fresh(), 1, $customer);
+            $this->fail('Une version périmée doit être refusée.');
+        } catch (ValidationException) {
+        }
+        $order->update(['status' => 'livree']);
+        try {
+            $action->handle($order->fresh(), 2, $customer);
+            $this->fail('Une commande terminale doit être refusée.');
+        } catch (ValidationException) {
+            $this->assertSame('livree', $order->fresh()->status);
+        }
     }
 
     /** @return array{Order, Product} */
