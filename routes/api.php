@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\CategoryController;
+use App\Http\Controllers\Api\Admin\InventoryController;
 use App\Http\Controllers\Api\Admin\OrderController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\ProductImageController;
@@ -29,6 +30,8 @@ Route::prefix('v1/admin')->middleware(['auth:sanctum', 'can:catalog.manage'])->g
     Route::post('products/{product}/variant-mode', [ProductController::class, 'variantMode']);
     Route::put('products/{product}/variants', [ProductController::class, 'replaceVariants']);
     Route::post('products/{product}/images', [ProductImageController::class, 'store']);
+    Route::get('inventory/movements', [InventoryController::class, 'index']);
+    Route::post('products/{product}/inventory-adjustments', [InventoryController::class, 'adjust']);
     Route::post('products/{product}/images/reorder', [ProductImageController::class, 'reorder']);
     Route::patch('products/{product}/images/{image:public_id}', [ProductImageController::class, 'update']);
     Route::delete('products/{product}/images/{image:public_id}', [ProductImageController::class, 'destroy']);

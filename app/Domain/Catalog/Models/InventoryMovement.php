@@ -3,6 +3,7 @@
 namespace App\Domain\Catalog\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 class InventoryMovement extends Model
@@ -22,5 +23,11 @@ class InventoryMovement extends Model
     protected static function booted(): void
     {
         static::creating(fn (self $model) => $model->public_id ??= (string) Str::ulid());
+    }
+
+    /** @return BelongsTo<Product, $this> */
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
     }
 }
