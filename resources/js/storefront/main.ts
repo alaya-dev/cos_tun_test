@@ -1,3 +1,7 @@
+import { configureSentry } from '../sentry';
+
+configureSentry();
+
 type Suggestion = { name: string; slug: string };
 type SearchResponse = { data: { products: Suggestion[]; categories: Suggestion[] } };
 type Variant = { public_id: string; stock_quantity: number; is_active: boolean; value_ids: number[] };

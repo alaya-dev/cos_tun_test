@@ -12,6 +12,7 @@ import OrderDetailView from './order-detail';
 import OrdersView from './orders';
 import ProductEditorView from './product-editor';
 import ProductsView from './products';
+import { configureSentry } from '../sentry';
 import {
     dismissError,
     dismissToast,
@@ -102,4 +103,7 @@ const router = createRouter({
     ],
 });
 
-createApp(Shell).use(createPinia()).use(router).mount('#admin-app');
+const app = createApp(Shell);
+
+configureSentry(app, router);
+app.use(createPinia()).use(router).mount('#admin-app');
