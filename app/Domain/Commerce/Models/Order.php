@@ -20,4 +20,10 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class);
     }
+
+    /** @return HasMany<OrderCheckoutValue, $this> */
+    public function checkoutValues(): HasMany
+    {
+        return $this->hasMany(OrderCheckoutValue::class);
+    }
 }

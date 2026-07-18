@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\Admin\CategoryController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\ProductImageController;
 use App\Http\Controllers\Api\CartQuoteController;
+use App\Http\Controllers\Api\CheckoutFieldsController;
+use App\Http\Controllers\Api\GuestOrderController;
 use App\Http\Controllers\Api\PublicSearchController;
 use App\Http\Controllers\HealthController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +16,8 @@ Route::get('/health/ready', [HealthController::class, 'ready'])->middleware('thr
 Route::prefix('v1/public')->group(function (): void {
     Route::get('/search/suggestions', PublicSearchController::class)->middleware('throttle:60,1');
     Route::post('/cart/quote', CartQuoteController::class)->middleware('throttle:60,1');
+    Route::get('/checkout-fields', CheckoutFieldsController::class)->middleware('throttle:30,1');
+    Route::post('/orders', GuestOrderController::class)->middleware('throttle:5,10');
 });
 
 Route::prefix('v1/admin')->middleware(['auth:sanctum', 'can:catalog.manage'])->group(function (): void {
