@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Admin\CategoryController;
+use App\Http\Controllers\Api\Admin\OrderController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\ProductImageController;
 use App\Http\Controllers\Api\CartQuoteController;
@@ -31,4 +32,7 @@ Route::prefix('v1/admin')->middleware(['auth:sanctum', 'can:catalog.manage'])->g
     Route::post('products/{product}/images/reorder', [ProductImageController::class, 'reorder']);
     Route::patch('products/{product}/images/{image:public_id}', [ProductImageController::class, 'update']);
     Route::delete('products/{product}/images/{image:public_id}', [ProductImageController::class, 'destroy']);
+    Route::get('orders', [OrderController::class, 'index']);
+    Route::get('orders/{order}', [OrderController::class, 'show']);
+    Route::post('orders/{order}/transitions', [OrderController::class, 'transition']);
 });
