@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Domain\Commerce\Actions\TransitionOrderStatusAction;
+use App\Domain\Commerce\Actions\UpdateOrderCustomerAction;
 use App\Domain\Commerce\Models\Order;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderController extends Controller
@@ -51,6 +53,16 @@ class OrderController extends Controller
         }
 
         return response()->json(['data' => $action->handle($order, $data['to_status'], $data['reason'] ?? null, $actor->id, $data['restock_items'] ?? false)]);
+    }
+
+    public function update(Request $request, Order $order, UpdateOrderCustomerAction $action): JsonResponse
+    {
+        $data = $request->validate(['lock_version' => ['required', 'integer', 'min:1'], 'customer.full_name' => ['required', 'string', 'between:2,180'], 'customer.phone' => ['required', 'string', 'max:40'], 'customer.city' => ['required', 'string', 'between:2,160'], 'customer.address' => ['required', 'string', 'between:5,2000']]);
+        try {
+            return response()->json(['data' => $action->handle($order, $data['lock_version'], $data['customer'])]);
+        } catch (ValidationException $exception) {
+            return response()->json(['code' => $exception->errors()['lock_version'] ?? $exception->errors()['order'] ?? 'ORDER_NOT_EDITABLE', 'message' => $exception->getMessage()], 409);
+        }
     }
 
     public function storeNote(Request $request, Order $order): JsonResponse

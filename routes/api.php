@@ -38,6 +38,7 @@ Route::prefix('v1/admin')->middleware(['auth:sanctum', 'can:catalog.manage'])->g
     Route::get('orders', [OrderController::class, 'index']);
     Route::get('orders/export', [OrderController::class, 'export']);
     Route::get('orders/{order}', [OrderController::class, 'show']);
+    Route::patch('orders/{order}', [OrderController::class, 'update']);
     Route::post('orders/{order}/transitions', [OrderController::class, 'transition']);
     Route::post('orders/{order}/notes', [OrderController::class, 'storeNote']);
 });
