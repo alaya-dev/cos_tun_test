@@ -485,7 +485,7 @@ Cross-cutting:
 ## 1.10 Acceptance gate
 
 - Application boots without Docker-specific assumptions.
-- MySQL and Redis are mandatory in test integration.
+- A MySQL-compatible database and Redis-compatible service are mandatory in test integration. The approved local baseline is XAMPP MariaDB and Memurai.
 - Storefront Blade renders.
 - Admin SPA mounts.
 - Queue job runs.

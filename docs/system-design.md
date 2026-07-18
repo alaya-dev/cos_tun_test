@@ -86,9 +86,9 @@ The initial architecture does not include:
 | Overall architecture | Modular Laravel monolith | Lowest operational complexity while preserving clear domain boundaries |
 | Public storefront | Laravel Blade server rendering with Vue 3 interactive islands | Best balance of SEO, mobile speed, Vue usability, and simple deployment |
 | Back office | Vue 3 + TypeScript SPA served by Laravel | Rich admin UX without affecting public SEO |
-| Backend | Laravel 13 | Current Laravel generation, strong authentication, validation, queues, cache, and testing support |
-| Database | MySQL 8.4 LTS | Stable production database with transactions, constraints, indexes, and mature tooling |
-| Cache and queues | Redis 8.x, pinned to a tested patch release | Fast cache, session storage, rate limiting, locks, and durable queue processing |
+| Backend | Laravel 12 on PHP 8.2 | Supported local baseline with authentication, validation, queues, cache, and testing support |
+| Database | MariaDB 10.4 locally | MySQL-compatible local database with transactions, constraints, indexes, and mature tooling |
+| Cache and queues | Memurai locally | Redis-compatible cache, session storage, rate limiting, locks, and durable queue processing |
 | Runtime web server | Nginx + PHP-FPM | Predictable Laravel production stack and static-asset performance |
 | Monitoring | Sentry for Laravel and Vue | Centralized errors, traces, releases, queue failures, and frontend errors |
 | Deployment | Docker Compose on one VPS | Reproducible environment, simple service management, easy rollback |
@@ -190,8 +190,8 @@ Application source code is immutable inside the deployed image.
 
 ### 7.1 Backend
 
-- PHP 8.4
-- Laravel 13
+- PHP 8.2
+- Laravel 12
 - Laravel Eloquent ORM
 - Laravel Form Requests
 - Laravel Policies and Gates
@@ -235,11 +235,11 @@ Vue storefront islands include only components that genuinely require client int
 
 ### 7.3 Data and infrastructure
 
-- MySQL 8.4 LTS
-- Redis 8.x, pinned to a tested patch release
+- MariaDB 10.4 through XAMPP for local development
+- Memurai for Redis-compatible local development
 - Nginx
 - PHP-FPM
-- Docker and Docker Compose v2
+- No container runtime during local development
 - S3-compatible remote backup destination
 - Sentry Laravel SDK
 - Sentry Vue SDK
@@ -2633,4 +2633,3 @@ It must define:
 - File upload contracts
 - Meta configuration and diagnostics contracts
 - Rate-limit groups
-

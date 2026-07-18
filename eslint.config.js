@@ -1,0 +1,1 @@
+export default [{ files: ['resources/js/**/*.ts'], languageOptions: { parserOptions: { ecmaVersion: 'latest', sourceType: 'module' } }, rules: { semi: ['error', 'always'], quotes: ['error', 'single'] } }];

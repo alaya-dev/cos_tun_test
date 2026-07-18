@@ -1004,7 +1004,7 @@ Rules:
 - Reset database between tests
 - Fake Meta and Sentry HTTP calls
 - Fake storage where appropriate
-- Use real MySQL and Redis for integration tests
+- Use the real local MariaDB/MySQL-compatible service and Memurai/Redis-compatible service for integration tests
 - Avoid brittle tests based on auto-increment values
 - Test public identifiers
 
@@ -1139,7 +1139,7 @@ php artisan test --coverage
 composer audit
 ```
 
-Use MySQL and Redis service containers.
+Use the local MariaDB/MySQL-compatible service and Memurai/Redis-compatible service. Do not require containers.
 
 ## 22.2 Frontend quality
 
