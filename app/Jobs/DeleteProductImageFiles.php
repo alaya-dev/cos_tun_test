@@ -24,10 +24,10 @@ class DeleteProductImageFiles implements ShouldQueue
 
     public function handle(): void
     {
-        Storage::disk('public')->delete(array_filter([
+        Storage::disk('public')->delete(array_unique(array_filter([
             $this->publicPath,
             ...array_values($this->renditions ?? []),
-        ]));
+        ])));
         Storage::disk('local')->delete(array_filter([$this->originalPath]));
     }
 }

@@ -8,6 +8,16 @@ use Illuminate\Validation\Rule;
 
 class SaveCheckoutFieldRequest extends FormRequest
 {
+    public function messages(): array
+    {
+        return ['key.unique' => 'Cette clé de champ existe déjà.'];
+    }
+
+    public function attributes(): array
+    {
+        return ['key' => 'clé du champ', 'label' => 'libellé français'];
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->can('store.manage') === true;

@@ -34,7 +34,7 @@ class RecordAuditEventAction
      */
     private function sanitize(array $values): array
     {
-        $hidden = ['password', 'password_confirmation', 'password_hash', 'current_password', 'remember_token', 'session', 'session_id', 'csrf', 'csrf_token', 'token', 'access_token', 'refresh_token', 'phone', 'address', 'raw_attribution', 'request_body'];
+        $hidden = ['password', 'password_confirmation', 'password_hash', 'current_password', 'remember_token', 'session', 'session_id', 'csrf', 'csrf_token', 'token', 'access_token', 'refresh_token', 'name', 'email', 'phone', 'telephone', 'address', 'subject', 'description', 'body', 'note', 'notes', 'attachment', 'raw_attribution', 'request_body'];
 
         $sanitized = [];
         foreach ($values as $key => $value) {

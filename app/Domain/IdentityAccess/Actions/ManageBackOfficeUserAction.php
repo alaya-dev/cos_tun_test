@@ -18,10 +18,10 @@ class ManageBackOfficeUserAction
     public function assertCanChange(User $target, User $actor, array $data): void
     {
         if ($target->id === $actor->id && (($data['is_active'] ?? true) === false || ($data['role'] ?? $target->role) !== 'super_admin')) {
-            throw ValidationException::withMessages(['user' => 'SELF_LOCKOUT_PROTECTED']);
+            throw ValidationException::withMessages(['user' => 'Cette action vous bloquerait l’accès.']);
         }
         if ($target->role === 'super_admin' && $target->is_active && (($data['is_active'] ?? true) === false || ($data['role'] ?? $target->role) !== 'super_admin') && User::query()->where('role', 'super_admin')->where('is_active', true)->count() <= 1) {
-            throw ValidationException::withMessages(['user' => 'LAST_SUPER_ADMIN_PROTECTED']);
+            throw ValidationException::withMessages(['user' => 'Le dernier Super Admin doit rester actif.']);
         }
     }
 }

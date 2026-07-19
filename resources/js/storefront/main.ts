@@ -1,7 +1,3 @@
-import { configureSentry } from '../sentry';
-
-configureSentry();
-
 type CartItem = { product_public_id: string; variant_public_id: string | null; quantity: number };
 type QuoteLine = { name: string; variant_label: string | null; quantity_requested: number; line_total: { formatted: string }; messages: string[] };
 type Quote = { data: { items: QuoteLine[]; pricing: { subtotal: { formatted: string }; promo_code: null | { code: string; discount: { formatted: string } }; shipping: { fee: { formatted: string } }; total: { formatted: string } }; can_checkout: boolean } };

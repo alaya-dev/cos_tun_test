@@ -1,4 +1,4 @@
-import { createApp, defineAsyncComponent, onMounted, ref } from 'vue';
+import { createApp, onMounted, ref } from 'vue';
 import { createPinia } from 'pinia';
 import {
     createRouter,
@@ -14,7 +14,6 @@ import ProductEditorView from './product-editor';
 import ProductsView from './products';
 import UsersView from './users';
 import AuditLogsView from './audit-logs';
-import { configureSentry } from '../sentry';
 import {
     dismissError,
     dismissToast,
@@ -22,14 +21,6 @@ import {
     resolveConfirmation,
     showError,
 } from './feedback';
-
-const PromotionsView = defineAsyncComponent(() => import('./promotions'));
-const ShippingSettingsView = defineAsyncComponent(() => import('./shipping-settings'));
-const CheckoutFieldsView = defineAsyncComponent(() => import('./checkout-fields'));
-const ContentView = defineAsyncComponent(() => import('./content'));
-const StaticPagesView = defineAsyncComponent(() => import('./static-pages'));
-const ComplaintsView = defineAsyncComponent(() => import('./complaints').then((module) => module.ComplaintsView));
-const ComplaintDetailView = defineAsyncComponent(() => import('./complaints').then((module) => module.ComplaintDetailView));
 
 const Shell = {
     components: { RouterLink, RouterView },
@@ -129,13 +120,13 @@ const router = createRouter({
         { path: '/orders', component: OrdersView },
         { path: '/orders/:reference', component: OrderDetailView },
         { path: '/inventory', component: InventoryView },
-        { path: '/complaints', component: ComplaintsView },
-        { path: '/complaints/:reference', component: ComplaintDetailView },
-        { path: '/promotions', component: PromotionsView },
-        { path: '/shipping', component: ShippingSettingsView },
-        { path: '/checkout-fields', component: CheckoutFieldsView },
-        { path: '/content', component: ContentView },
-        { path: '/static-pages', component: StaticPagesView },
+        { path: '/complaints', component: () => import('./complaints').then((module) => module.ComplaintsView) },
+        { path: '/complaints/:reference', component: () => import('./complaints').then((module) => module.ComplaintDetailView) },
+        { path: '/promotions', component: () => import('./promotions') },
+        { path: '/shipping', component: () => import('./shipping-settings') },
+        { path: '/checkout-fields', component: () => import('./checkout-fields') },
+        { path: '/content', component: () => import('./content') },
+        { path: '/static-pages', component: () => import('./static-pages') },
         { path: '/users', component: UsersView },
         { path: '/audit-logs', component: AuditLogsView },
     ],
@@ -143,5 +134,4 @@ const router = createRouter({
 
 const app = createApp(Shell);
 
-configureSentry(app, router);
 app.use(createPinia()).use(router).mount('#admin-app');

@@ -9,7 +9,7 @@ class AuditLogResource extends JsonResource
     /** @return array<string, mixed> */
     public function toArray($request): array
     {
-        $hidden = ['password', 'password_confirmation', 'token', 'session', 'phone', 'address'];
+        $hidden = ['password', 'password_confirmation', 'token', 'session', 'phone', 'telephone', 'email', 'address', 'name', 'subject', 'description', 'body', 'note', 'notes', 'attachment'];
         $clean = function (mixed $value) use (&$clean, $hidden): mixed {
             if (! is_array($value)) {
                 return $value;

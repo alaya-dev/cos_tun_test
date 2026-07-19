@@ -4,8 +4,8 @@ namespace App\Domain\Catalog\Services;
 
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
+use App\Support\Media\PublicMediaUrl;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
 
 class CatalogSearchService
 {
@@ -37,7 +37,7 @@ class CatalogSearchService
                         'public_id' => $product->public_id,
                         'name' => $product->name,
                         'slug' => $product->slug,
-                        'primary_image_url' => $primary?->path ? Storage::disk('public')->url($primary->path) : null,
+                        'primary_image_url' => app(PublicMediaUrl::class)->forPath($primary?->path),
                         'effective_price' => [
                             'millimes' => $price,
                             'formatted' => number_format($price / 1000, 3, ',', ' ').' TND',

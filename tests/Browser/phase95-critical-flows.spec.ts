@@ -1,4 +1,19 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+const browserErrors = new WeakMap<Page, string[]>();
+
+test.beforeEach(async ({ page }) => {
+    const errors: string[] = [];
+    browserErrors.set(page, errors);
+    page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
+    page.on('console', (message) => {
+        if (message.type() === 'error') errors.push(`console: ${message.text()}`);
+    });
+});
+
+test.afterEach(async ({ page }) => {
+    expect(browserErrors.get(page) ?? [], 'Le navigateur a signalé une erreur de rendu.').toEqual([]);
+});
 
 test('public storefront renders French shell', async ({ page }) => {
     await page.goto('/');

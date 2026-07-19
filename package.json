@@ -14,7 +14,6 @@
     },
     "devDependencies": {
         "@playwright/test": "^1.61.1",
-        "@sentry/vue": "^10.65.0",
         "@tailwindcss/vite": "^4.0.0",
         "@types/node": "^26.1.1",
         "@typescript-eslint/parser": "^8.63.0",

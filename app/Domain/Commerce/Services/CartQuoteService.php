@@ -74,7 +74,7 @@ class CartQuoteService
         $effective = $product instanceof Product ? ($product->promotional_price_millimes ?? $regular) : $regular;
         $variantLabel = $variant ? $variant->values->map(fn ($value) => ($value->productOptionGroup?->name ?: '').': '.$value->value)->implode(', ') : null;
 
-        return ['product_public_id' => $item['product_public_id'], 'variant_public_id' => $item['variant_public_id'], 'name' => $product instanceof Product ? $product->name : 'Produit indisponible', 'variant_label' => $variantLabel, 'image_url' => $product?->images->first()?->publicUrl(), 'quantity_requested' => $item['quantity'], 'quantity_available' => $variant !== null ? $variant->stock_quantity : ($product instanceof Product ? $product->stock_quantity ?? 0 : 0), 'is_available' => $messages === [], 'regular_unit_price' => $this->money($regular), 'effective_unit_price' => $this->money($effective), 'line_total' => $this->money($effective * $item['quantity']), 'messages' => $messages];
+        return ['product_public_id' => $item['product_public_id'], 'variant_public_id' => $item['variant_public_id'], 'name' => $product instanceof Product ? $product->name : 'Produit indisponible', 'variant_label' => $variantLabel, 'image_url' => $product?->images->first()?->public_url, 'quantity_requested' => $item['quantity'], 'quantity_available' => $variant !== null ? $variant->stock_quantity : ($product instanceof Product ? $product->stock_quantity ?? 0 : 0), 'is_available' => $messages === [], 'regular_unit_price' => $this->money($regular), 'effective_unit_price' => $this->money($effective), 'line_total' => $this->money($effective * $item['quantity']), 'messages' => $messages];
     }
 
     /** @return array{millimes: int, formatted: string} */

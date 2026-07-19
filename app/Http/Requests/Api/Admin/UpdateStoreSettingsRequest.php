@@ -7,6 +7,22 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateStoreSettingsRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $whatsApp = $this->input('whatsapp_url');
+        if (is_string($whatsApp)) {
+            $digits = preg_replace('/\D+/', '', $whatsApp) ?? '';
+            if (preg_match('/^(?:216)?(\d{8})$/', $digits, $matches) === 1) {
+                $whatsApp = 'https://wa.me/216'.$matches[1];
+            }
+        }
+        $socialLinks = $this->input('social_links');
+        if (is_array($socialLinks)) {
+            $socialLinks = array_map(fn (mixed $url): mixed => is_string($url) ? rtrim(trim($url), '/') : $url, $socialLinks);
+        }
+        $this->merge(['whatsapp_url' => $whatsApp, 'social_links' => $socialLinks]);
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->can('store.manage') === true;

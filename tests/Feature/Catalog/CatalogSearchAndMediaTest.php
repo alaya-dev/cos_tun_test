@@ -9,6 +9,7 @@ use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Models\ProductImage;
 use App\Jobs\ProcessProductImage;
 use App\Models\User;
+use App\Support\Media\PublicMediaUrl;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -61,6 +62,13 @@ class CatalogSearchAndMediaTest extends TestCase
         $this->assertSame([480, 768, 1200], array_keys($image->renditions));
         Storage::disk('public')->assertExists($image->renditions['1200']);
         Storage::disk('local')->assertMissing($image->original_path);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/admin/products/'.$product->public_id)
+            ->assertOk()
+            ->assertJsonPath('data.images.0.processing_status', 'ready')
+            ->assertJsonPath('data.images.0.public_url', '/storage/'.$image->renditions['1200'])
+            ->assertJsonMissingPath('data.images.0.original_path');
     }
 
     public function test_product_image_rejects_an_invalid_image_signature(): void
@@ -126,5 +134,18 @@ class CatalogSearchAndMediaTest extends TestCase
 
         $this->assertNull($image->fresh()->product_variant_id);
         $this->assertTrue($image->fresh()->is_primary);
+    }
+
+    public function test_pending_or_failed_media_never_exposes_a_public_derivative_url(): void
+    {
+        $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage-etats', 'is_active' => true]);
+        $product = Product::query()->create(['category_id' => $category->id, 'name' => 'Crème', 'slug' => 'creme-etats', 'regular_price_millimes' => 12_500, 'stock_quantity' => 3, 'is_active' => false]);
+
+        $pending = ProductImage::query()->create(['product_id' => $product->id, 'path' => 'products/pending.webp', 'processing_status' => 'pending']);
+        $failed = ProductImage::query()->create(['product_id' => $product->id, 'path' => 'products/failed.webp', 'processing_status' => 'failed']);
+
+        $this->assertNull($pending->mediaUrl());
+        $this->assertNull($failed->mediaUrl());
+        $this->assertSame('/storage/products/ready.webp', app(PublicMediaUrl::class)->forPath('products/ready.webp'));
     }
 }

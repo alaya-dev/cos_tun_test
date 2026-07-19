@@ -9,6 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ProcessProductImage implements ShouldQueue
 {
@@ -84,5 +85,13 @@ class ProcessProductImage implements ShouldQueue
             'processing_status' => 'ready',
         ]);
         Storage::disk('local')->delete($image->original_path);
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        ProductImage::query()
+            ->whereKey($this->imageId)
+            ->where('processing_status', 'pending')
+            ->update(['processing_status' => 'failed']);
     }
 }

@@ -7,7 +7,10 @@ describe('identity and audit modules', () => {
         const audit = readFileSync('resources/js/admin/audit-logs.ts', 'utf8');
         expect(users).toContain('Utilisateurs');
         expect(audit).toContain('Journal d’audit');
-        expect(users).not.toMatch(/['"](password|token|address)['"]/i);
-        expect(audit).not.toMatch(/['"](password|token|address)['"]/i);
+        expect(users).toContain('password_confirmation');
+        expect(audit).toContain('privateAuditFields');
+        expect(audit).toContain('filter(key => !privateAuditFields.has(key))');
+        expect(audit).not.toContain('{{ log.before }}');
+        expect(audit).not.toContain('{{ log.after }}');
     });
 });

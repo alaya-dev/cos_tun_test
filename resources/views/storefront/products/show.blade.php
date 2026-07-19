@@ -8,7 +8,7 @@
         'offers' => ['@type' => 'Offer', 'priceCurrency' => 'TND', 'price' => number_format($price / 1000, 3, '.', ''), 'availability' => 'https://schema.org/'.($product->has_variants ? 'InStock' : ($product->stock_quantity > 0 ? 'InStock' : 'OutOfStock'))],
     ];
     $variantsForClient = $product->variants->map(fn ($variant) => ['public_id' => $variant->public_id, 'stock_quantity' => $variant->stock_quantity, 'is_active' => $variant->is_active, 'value_ids' => $variant->values->pluck('id')->values()]);
-    if ($primaryImage?->publicUrl()) $structuredData['image'] = $primaryImage->publicUrl();
+    if ($primaryImage?->public_url) $structuredData['image'] = $primaryImage->public_url;
 @endphp
 <x-layouts.storefront :title="($product->seo_title ?: $product->name).' | Passion Cosmetic'" :description="$product->seo_description ?: ($product->short_description ?: Str::limit(strip_tags($product->full_description ?: ''), 155))" :canonical="route('storefront.product', $product->slug)">
     @push('head')<script type="application/ld+json">@json($structuredData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)</script>@endpush
@@ -16,8 +16,8 @@
         <nav class="breadcrumb" aria-label="Fil d’Ariane"><a href="{{ route('storefront.home') }}">Accueil</a><span>/</span><a href="{{ route('storefront.category', $product->category->slug) }}">{{ $product->category->name }}</a><span>/</span><span aria-current="page">{{ $product->name }}</span></nav>
         <div class="product-layout" data-product-detail data-product-public-id="{{ $product->public_id }}" data-product-variants='@json($variantsForClient)'>
             <div class="product-gallery" data-gallery>
-                <div class="product-main-image">@if($primaryImage && $primaryImage->publicUrl())<img src="{{ $primaryImage->publicUrl() }}" width="{{ $primaryImage->width }}" height="{{ $primaryImage->height }}" alt="{{ $primaryImage->alt_text ?: $product->name }}" data-gallery-main>@else<span class="product-image-placeholder">PC</span>@endif</div>
-                @if($product->images->count() > 1)<div class="gallery-thumbnails">@foreach($product->images as $image)<button type="button" data-gallery-image="{{ $image->publicUrl() }}" aria-label="Voir l’image {{ $loop->iteration }}"><img src="{{ $image->publicUrl() }}" width="96" height="96" alt=""></button>@endforeach</div>@endif
+                <div class="product-main-image">@if($primaryImage && $primaryImage->public_url)<img src="{{ $primaryImage->public_url }}" width="{{ $primaryImage->width }}" height="{{ $primaryImage->height }}" alt="{{ $primaryImage->alt_text ?: $product->name }}" data-gallery-main>@else<span class="product-image-placeholder">PC</span>@endif</div>
+                @if($product->images->count() > 1)<div class="gallery-thumbnails">@foreach($product->images as $image)<button type="button" data-gallery-image="{{ $image->public_url }}" aria-label="Voir l’image {{ $loop->iteration }}"><img src="{{ $image->public_url }}" width="96" height="96" alt=""></button>@endforeach</div>@endif
             </div>
             <div class="product-details">
                 <a class="product-category" href="{{ route('storefront.category', $product->category->slug) }}">{{ $product->category->name }}</a>

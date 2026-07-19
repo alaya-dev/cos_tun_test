@@ -45,6 +45,12 @@ class AppServiceProvider extends ServiceProvider
                 Limit::perDay(5)->by('phone:'.hash_hmac('sha256', $phone, (string) config('app.key'))),
             ];
         });
+        RateLimiter::for('checkout-orders', function (Request $request): Limit {
+            $phone = preg_replace('/\D+/', '', (string) $request->input('customer.phone')) ?? '';
+            $identity = hash_hmac('sha256', ($request->ip() ?? 'unknown').'|'.$phone, (string) config('app.key'));
+
+            return Limit::perMinute(8)->by('checkout:'.$identity);
+        });
         Gate::define('catalog.manage', [CatalogPolicy::class, 'manage']);
         Gate::define('users.manage', [BackOfficeUserPolicy::class, 'manage']);
         Gate::define('audit.view', [AuditLogPolicy::class, 'viewAny']);

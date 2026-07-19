@@ -33,7 +33,7 @@ Route::prefix('v1/public')->group(function (): void {
     Route::get('/search/suggestions', PublicSearchController::class)->middleware('throttle:60,1');
     Route::post('/cart/quote', CartQuoteController::class)->middleware('throttle:60,1');
     Route::get('/checkout-fields', CheckoutFieldsController::class)->middleware('throttle:30,1');
-    Route::post('/orders', GuestOrderController::class)->middleware('throttle:5,10');
+    Route::post('/orders', GuestOrderController::class)->middleware('throttle:checkout-orders');
     Route::post('/complaints', PublicComplaintController::class)->middleware('throttle:complaints');
 });
 

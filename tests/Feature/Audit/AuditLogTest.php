@@ -19,12 +19,11 @@ class AuditLogTest extends TestCase
         $user = User::factory()->create(['role' => 'super_admin', 'is_active' => true]);
         $category = Category::query()->create(['name' => 'Audit', 'slug' => 'audit-'.str()->random(8), 'is_active' => true]);
 
-        $log = app(RecordAuditEventAction::class)->handle('update', $category, $user, ['password' => 'secret', 'phone' => '22123456'], ['token' => 'abc', 'name' => 'Produit']);
+        $log = app(RecordAuditEventAction::class)->handle('update', $category, $user, ['password' => 'secret', 'phone' => '22123456', 'email' => 'client@example.test'], ['token' => 'abc', 'name' => 'Produit']);
 
         $this->assertDatabaseHas('audit_logs', ['id' => $log->id, 'actor_user_id' => $user->id, 'action' => 'update']);
-        $this->assertSame(['name' => 'Produit'], $log->fresh()->after);
         $this->assertSame([], $log->fresh()->before);
-
+        $this->assertSame([], $log->fresh()->after);
         $this->expectException(\LogicException::class);
         $log->update(['action' => 'delete']);
     }

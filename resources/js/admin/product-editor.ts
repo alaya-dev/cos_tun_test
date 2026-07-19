@@ -19,6 +19,7 @@ type Media = {
     alt_text: string | null;
     is_primary: boolean;
     processing_status: string;
+    public_url?: string | null;
     variant?: { public_id: string } | null;
     role?: MediaRole;
     variant_public_id?: string;
@@ -65,12 +66,7 @@ const dt = (value: number | null) =>
     value === null ? '' : (value / 1000).toFixed(3).replace('.', ',');
 const millimes = (value: string) =>
     Math.round(Number(value.replace(',', '.')) * 1000);
-const mediaUrl = (image: Media) =>
-    image.path
-        ? image.path.startsWith('/') || image.path.startsWith('http')
-            ? image.path
-            : `/storage/${image.path}`
-        : '';
+const mediaUrl = (image: Media) => image.public_url || '';
 async function api<T>(
     path: string,
     method = 'GET',

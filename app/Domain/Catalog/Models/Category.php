@@ -4,15 +4,22 @@ namespace App\Domain\Catalog\Models;
 
 use App\Domain\Catalog\Services\CatalogCacheVersion;
 use App\Domain\Content\Services\HomepageCache;
+use App\Support\Media\PublicMediaUrl;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
+/**
+ * @property-read string|null $image_url
+ * @property-read string $image_status
+ */
 class Category extends Model
 {
     use SoftDeletes;
+
+    protected $appends = ['image_url', 'image_status'];
 
     protected $fillable = ['public_id', 'name', 'slug', 'description', 'image_path', 'image_processing_status', 'image_width', 'image_height', 'is_active', 'sort_order', 'seo_title', 'seo_description'];
 
@@ -45,8 +52,22 @@ class Category extends Model
         return 'public_id';
     }
 
-    public function imageUrl(): ?string
+    public function mediaUrl(): ?string
     {
-        return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;
+        return ($this->image_processing_status ?: ($this->image_path ? 'ready' : 'none')) === 'ready'
+            ? app(PublicMediaUrl::class)->forPath($this->image_path)
+            : null;
+    }
+
+    /** @return Attribute<string|null, never> */
+    protected function imageUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->mediaUrl());
+    }
+
+    /** @return Attribute<non-falsy-string, never> */
+    protected function imageStatus(): Attribute
+    {
+        return Attribute::get(fn (): string => $this->image_processing_status ?: ($this->image_path ? 'ready' : 'none'));
     }
 }

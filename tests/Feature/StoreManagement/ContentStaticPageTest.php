@@ -107,6 +107,21 @@ class ContentStaticPageTest extends TestCase
         Storage::disk('public')->assertExists($category->fresh()->image_path);
     }
 
+    public function test_store_social_urls_and_tunisian_whatsapp_numbers_are_normalized_safely(): void
+    {
+        $superAdmin = User::factory()->create(['role' => 'super_admin', 'is_active' => true]);
+
+        $this->actingAs($superAdmin, 'sanctum')->patchJson('/api/v1/admin/settings/store', [
+            'phone' => null, 'email' => null, 'address' => null, 'whatsapp_url' => '+216 12 345 678',
+            'social_links' => ['instagram' => 'https://www.instagram.com/passion/', 'facebook' => null, 'tiktok' => null, 'youtube' => null],
+            'announcement_text' => null, 'footer_statement' => null, 'hero_autoplay_enabled' => true,
+        ])->assertOk()->assertJsonPath('data.whatsapp_url', 'https://wa.me/21612345678')->assertJsonPath('data.social_links.instagram', 'https://www.instagram.com/passion');
+
+        $this->actingAs($superAdmin, 'sanctum')->patchJson('/api/v1/admin/settings/store', [
+            'whatsapp_url' => 'https://user:secret@wa.me/21612345678', 'social_links' => ['instagram' => 'https://user:secret@www.instagram.com/passion'], 'hero_autoplay_enabled' => true,
+        ])->assertUnprocessable()->assertJsonMissingPath('errors.whatsapp_url.0.validation');
+    }
+
     public function test_rich_text_is_strictly_sanitized(): void
     {
         $html = '<h2 style="color:red">Titre</h2><script>alert(1)</script><iframe src="https://evil.test"></iframe><p onclick="x()">Texte <a href="javascript:alert(1)" style="x">lien</a></p><a href="/produits">interne</a>';

@@ -8,6 +8,16 @@ use Illuminate\Validation\Rule;
 
 class SavePromoCodeRequest extends FormRequest
 {
+    public function messages(): array
+    {
+        return ['code.unique' => 'Ce code promo existe déjà.'];
+    }
+
+    public function attributes(): array
+    {
+        return ['code' => 'code promo'];
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->can('store.manage') === true;

@@ -3,9 +3,10 @@
 namespace App\Domain\Catalog\Models;
 
 use App\Domain\Catalog\Services\CatalogCacheVersion;
+use App\Support\Media\PublicMediaUrl;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -16,9 +17,15 @@ use Illuminate\Support\Str;
  * @property array<int|string, string>|null $renditions
  * @property bool $is_primary
  * @property string $processing_status
+ * @property-read string|null $public_url
+ * @property-read array<int, string> $public_renditions
  */
 class ProductImage extends Model
 {
+    protected $appends = ['public_url', 'public_renditions'];
+
+    protected $hidden = ['original_path'];
+
     protected $fillable = ['public_id', 'product_id', 'product_variant_id', 'path', 'renditions', 'original_path', 'alt_text', 'width', 'height', 'sort_order', 'is_primary', 'processing_status'];
 
     protected function casts(): array
@@ -38,9 +45,17 @@ class ProductImage extends Model
         return 'public_id';
     }
 
-    public function publicUrl(): ?string
+    public function mediaUrl(): ?string
     {
-        return $this->path ? Storage::disk('public')->url($this->path) : null;
+        return $this->processing_status === 'ready'
+            ? app(PublicMediaUrl::class)->forPath($this->path)
+            : null;
+    }
+
+    /** @return Attribute<string|null, never> */
+    protected function publicUrl(): Attribute
+    {
+        return Attribute::get(fn (): ?string => $this->mediaUrl());
     }
 
     /** @return BelongsTo<ProductVariant, $this> */
@@ -50,10 +65,17 @@ class ProductImage extends Model
     }
 
     /** @return array<int, string> */
-    public function publicRenditions(): array
+    public function mediaRenditions(): array
     {
         return collect($this->renditions ?? [])
-            ->mapWithKeys(fn (string $path, int|string $width): array => [(int) $width => Storage::disk('public')->url($path)])
+            ->mapWithKeys(fn (string $path, int|string $width): array => [(int) $width => app(PublicMediaUrl::class)->forPath($path)])
+            ->filter()
             ->all();
+    }
+
+    /** @return Attribute<array<int, string>, never> */
+    protected function publicRenditions(): Attribute
+    {
+        return Attribute::get(fn (): array => $this->mediaRenditions());
     }
 }

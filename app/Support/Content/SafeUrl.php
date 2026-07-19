@@ -18,6 +18,13 @@ class SafeUrl
             return false;
         }
 
+        if (isset($parts['user']) || isset($parts['pass'])) {
+            return false;
+        }
+        if (isset($parts['port']) && (int) $parts['port'] !== 443) {
+            return false;
+        }
+
         return $approvedHosts === [] || in_array(mb_strtolower($parts['host']), $approvedHosts, true);
     }
 

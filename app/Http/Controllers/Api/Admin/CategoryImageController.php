@@ -33,7 +33,7 @@ class CategoryImageController extends Controller
 
         $category->refresh();
 
-        return response()->json(['data' => array_merge($category->toArray(), ['image_url' => $category->imageUrl()])]);
+        return response()->json(['data' => $category->toArray()]);
     }
 
     public function destroy(Request $request, Category $category, HomepageCache $cache, RecordAuditEventAction $audit): JsonResponse
@@ -48,6 +48,6 @@ class CategoryImageController extends Controller
 
         $category->refresh();
 
-        return response()->json(['data' => array_merge($category->toArray(), ['image_url' => $category->imageUrl()])]);
+        return response()->json(['data' => $category->toArray()]);
     }
 }

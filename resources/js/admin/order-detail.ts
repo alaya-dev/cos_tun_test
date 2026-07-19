@@ -53,10 +53,15 @@ const OrderDetailView: Component = {
         const loading = ref(true);
         const saving = ref(false);
         const refresh = async () => {
-            const next = (await api<{ data: Detail }>(`orders/${route.params.reference}`)).data;
+            const next = (await api<{ data?: Detail }>(`orders/${route.params.reference}`)).data;
+            if (!next?.order || !Array.isArray(next.order.items)) {
+                throw new Error('La commande reçue est invalide.');
+            }
             detail.value = next;
-            customer.value = { full_name: next.order.customer_name, phone: next.order.customer_phone, city: next.order.customer_city, address: next.order.customer_address };
-            lines.value = next.order.items.flatMap((item) => item.product ? [{ product_public_id: item.product.public_id, variant_public_id: item.variant?.public_id || null, quantity: item.quantity, label: item.product_name_snapshot, variants: item.product.variants.filter((variant) => variant.is_active) }] : []);
+            customer.value = { full_name: next.order.customer_name || '', phone: next.order.customer_phone || '', city: next.order.customer_city || '', address: next.order.customer_address || '' };
+            lines.value = next.order.items.flatMap((item) => item.product && Array.isArray(item.product.variants)
+                ? [{ product_public_id: item.product.public_id, variant_public_id: item.variant?.public_id || null, quantity: item.quantity, label: item.product_name_snapshot, variants: item.product.variants.filter((variant) => variant.is_active) }]
+                : []);
         };
         onMounted(async () => { try { await refresh(); } catch (cause: unknown) { showError(cause instanceof Error ? cause.message : 'Impossible de charger la commande.'); } finally { loading.value = false; } });
         const run = async (path: string, method: string, body: unknown, successMessage: string) => {

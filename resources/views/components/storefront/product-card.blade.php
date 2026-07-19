@@ -1,13 +1,13 @@
 @props(['product'])
 @php
     $image = $product->images->first();
-    $renditions = $image?->publicRenditions() ?? [];
+    $renditions = $image?->public_renditions ?? [];
     $price = $product->promotional_price_millimes ?? $product->regular_price_millimes;
 @endphp
 <article class="product-card">
     <a class="product-card-image" href="{{ route('storefront.product', $product->slug) }}">
-        @if($image && $image->publicUrl())
-            <img src="{{ $image->publicUrl() }}"
+        @if($image && $image->public_url)
+            <img src="{{ $image->public_url }}"
                  @if($renditions) srcset="@foreach($renditions as $width => $url) {{ $url }} {{ $width }}w{{ !$loop->last ? ',' : '' }} @endforeach" sizes="(min-width: 1024px) 25vw, 50vw" @endif
                  width="{{ $image->width }}" height="{{ $image->height }}" loading="lazy" alt="{{ $image->alt_text ?: $product->name }}">
         @else
