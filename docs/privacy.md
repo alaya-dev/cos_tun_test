@@ -7,7 +7,7 @@
 **Documentation language:** English  
 **Public privacy notice language:** French  
 **Target market:** Tunisia  
-**Related documents:** `prd.md`, `system-design.md`, `api-contracts.md`, `security-rules.md`
+**Related documents:** `prd.md`, `system-design.md`, `api-contracts.md`, `security.md`
 
 ---
 
@@ -53,7 +53,7 @@ The platform must follow these principles:
 3. **Transparency:** explain what is collected, why, and with whom it is shared.
 4. **Accuracy:** allow incorrect customer information to be corrected.
 5. **Limited retention:** remove or anonymize data when it is no longer needed and legal retention has ended.
-6. **Security:** protect data through the controls in `security-rules.md`.
+6. **Security:** protect data through the controls in `security.md`.
 7. **Access limitation:** only authorized Admin and Super Admin users may access customer data.
 8. **Consent control:** do not activate advertising tracking before the applicable consent condition is satisfied.
 9. **No hidden reuse:** do not reuse order or complaint data for unrelated marketing.

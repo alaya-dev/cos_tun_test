@@ -1,10 +1,14 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AuditLogController;
 use App\Http\Controllers\Api\Admin\CategoryController;
+use App\Http\Controllers\Api\Admin\CurrentUserController;
 use App\Http\Controllers\Api\Admin\InventoryController;
 use App\Http\Controllers\Api\Admin\OrderController;
+use App\Http\Controllers\Api\Admin\PasswordController;
 use App\Http\Controllers\Api\Admin\ProductController;
 use App\Http\Controllers\Api\Admin\ProductImageController;
+use App\Http\Controllers\Api\Admin\UserController;
 use App\Http\Controllers\Api\CartQuoteController;
 use App\Http\Controllers\Api\CheckoutFieldsController;
 use App\Http\Controllers\Api\GuestOrderController;
@@ -33,7 +37,7 @@ Route::prefix('v1/admin')->middleware(['web', 'auth', 'can:catalog.manage'])->gr
     Route::post('products/bulk-force-delete', [ProductController::class, 'bulkForceDelete']);
     Route::post('products/{product}/variant-mode', [ProductController::class, 'variantMode']);
     Route::put('products/{product}/variants', [ProductController::class, 'replaceVariants']);
-    Route::post('products/{product}/images', [ProductImageController::class, 'store']);
+    Route::post('products/{product}/images', [ProductImageController::class, 'store'])->middleware('throttle:media-upload');
     Route::get('inventory/movements', [InventoryController::class, 'index']);
     Route::post('products/{product}/inventory-adjustments', [InventoryController::class, 'adjust']);
     Route::post('products/{product}/images/reorder', [ProductImageController::class, 'reorder']);
@@ -49,4 +53,17 @@ Route::prefix('v1/admin')->middleware(['web', 'auth', 'can:catalog.manage'])->gr
     Route::post('orders/bulk-archive', [OrderController::class, 'bulkArchive']);
     Route::post('orders/bulk-restore', [OrderController::class, 'bulkRestore']);
     Route::post('orders/bulk-transition', [OrderController::class, 'bulkTransition']);
+});
+
+Route::prefix('v1/admin')->middleware(['web', 'auth'])->group(function (): void {
+    Route::get('me', [CurrentUserController::class, 'show']);
+    Route::post('me/password', [PasswordController::class, 'update']);
+});
+
+Route::prefix('v1/admin')->middleware(['web', 'auth', 'can:users.manage'])->group(function (): void {
+    Route::apiResource('users', UserController::class)->only(['index', 'store', 'show', 'update', 'destroy']);
+});
+
+Route::prefix('v1/admin')->middleware(['web', 'auth', 'can:users.manage'])->group(function (): void {
+    Route::apiResource('audit-logs', AuditLogController::class)->only(['index', 'show']);
 });

@@ -12,6 +12,9 @@ import {
     showToast,
     confirmAction,
 } from './feedback';
+import SelectControl from './select-control';
+import UsersView from './users';
+import AuditLogsView from './audit-logs';
 
 describe('admin operational modules', () => {
     it('exports the catalogue, inventory, order list, and order detail views', () => {
@@ -19,6 +22,9 @@ describe('admin operational modules', () => {
         expect(InventoryView).toBeTruthy();
         expect(OrdersView).toBeTruthy();
         expect(OrderDetailView).toBeTruthy();
+        expect(SelectControl).toBeTruthy();
+        expect(UsersView).toBeTruthy();
+        expect(AuditLogsView).toBeTruthy();
     });
 
     it('manages feedback state through shared dialogs and toasts', async () => {

@@ -48,9 +48,14 @@ php artisan test
 npm run lint
 npm run typecheck
 npm run test:coverage
+npm test -- --run
+npm run test:browser
 npm run build
+node scripts/check-asset-budgets.mjs
 composer audit
 npm audit --audit-level=high
+composer check-doc-references
+git diff --check
 ```
 
 Run the configured browser smoke suite and reference/hygiene/budget commands added by this
@@ -64,3 +69,9 @@ Capture command output, migration rehearsal result, contract-test result, browse
 coverage report, asset-budget result, Sentry redaction verification, and human diff review in
 the change record. Resolve each B1, B3–B5, I1–I8, M1, and M2 audit finding before advancing;
 record B2 verification separately.
+
+Current local evidence: backend tests (79 tests, 287 assertions), Pint, PHPStan, `composer test:coverage`
+with the local Xdebug coverage driver, frontend lint/typecheck/tests, Playwright smoke tests, asset
+budgets, Composer audit, npm audit, documentation references, and diff checks pass. Frontend
+coverage remains below its configured 80% line / 70% branch thresholds and is intentionally not
+waived or lowered.

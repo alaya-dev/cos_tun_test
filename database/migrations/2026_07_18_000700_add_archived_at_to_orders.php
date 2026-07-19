@@ -15,6 +15,8 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Destructive on populated databases: restore this column with a forward
+        // migration before rollback if archived history must be preserved.
         Schema::table('orders', fn (Blueprint $table) => $table->dropColumn('archived_at'));
     }
 };

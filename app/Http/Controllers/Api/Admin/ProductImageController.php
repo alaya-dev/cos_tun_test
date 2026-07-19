@@ -20,7 +20,7 @@ class ProductImageController extends Controller
         $imageInfo = @getimagesize($uploaded->getRealPath());
         $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
         abort_unless($imageInfo !== false && in_array($imageInfo['mime'], $allowedMimeTypes, true), 422, 'Fichier image invalide.');
-        abort_if(($imageInfo[0] * $imageInfo[1]) > 25_000_000, 422, 'L’image est trop grande.');
+        abort_if(($imageInfo[0] * $imageInfo[1]) > 20_000_000, 422, 'L’image est trop grande.');
 
         $variant = isset($data['variant_public_id']) ? $product->variants()->where('public_id', $data['variant_public_id'])->firstOrFail() : null;
         $staged = $request->file('image')->store('product-staging', 'local');

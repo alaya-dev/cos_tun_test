@@ -30,7 +30,7 @@ It defines:
 - File storage, backup, monitoring, and deployment design
 - Technical guardrails that implementation must not violate
 
-Detailed request and response payloads belong in `api-contracts.md`. Full security controls belong in `security-rules.md`. UI specifications belong in `design.md`.
+Detailed request and response payloads belong in `api-contracts.md`. Full security controls belong in `security.md`. UI specifications belong in `design.md`.
 
 ---
 
@@ -2157,7 +2157,7 @@ Never log:
 
 ## 26. Security Architecture Overview
 
-The complete control catalogue belongs in `security-rules.md`. The architecture must already support the following boundaries.
+The complete control catalogue belongs in `security.md`. The architecture must already support the following boundaries.
 
 ### 26.1 Trust boundaries
 
@@ -2606,7 +2606,7 @@ Codex must follow these rules throughout implementation:
 This system design is the technical source of truth for:
 
 1. `api-contracts.md`
-2. `security-rules.md`
+2. `security.md`
 3. `privacy.md`
 4. `design.md`
 5. `quality-rules.md`

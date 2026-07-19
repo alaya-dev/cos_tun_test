@@ -47,6 +47,24 @@ class OrderTransitionTest extends TestCase
         $this->assertSame(2, $product->fresh()->stock_quantity);
     }
 
+    public function test_terminal_transition_requires_reason_and_return_can_restock_once(): void
+    {
+        [$order, $product] = $this->orderWithItem();
+        $actor = User::factory()->create();
+        $action = app(TransitionOrderStatusAction::class);
+        try {
+            $action->handle($order, 'annulee', null, $actor->id);
+            $this->fail('Un motif doit être requis.');
+        } catch (ValidationException) {
+            $this->assertSame('nouvelle', $order->fresh()->status);
+        }
+        $order->refresh();
+        $order->update(['status' => 'confirmee']);
+        $action->handle($order->fresh(), 'livree', null, $actor->id);
+        $action->handle($order->fresh(), 'retournee', 'Retour client', $actor->id, true);
+        $this->assertSame(3, $product->fresh()->stock_quantity);
+    }
+
     public function test_customer_update_rejects_stale_version_and_terminal_orders(): void
     {
         [$order] = $this->orderWithItem();
@@ -85,7 +103,7 @@ class OrderTransitionTest extends TestCase
     public function test_item_reconciliation_locks_and_uses_the_selected_variant(): void
     {
         [$order, $oldProduct] = $this->orderWithItem();
-        $replacement = Product::query()->create(['category_id' => $oldProduct->category_id, 'name' => 'Gel avec teinte', 'slug' => 'gel-'.str()->random(6), 'regular_price_millimes' => 15_000, 'stock_quantity' => 0, 'has_variants' => true, 'is_active' => true]);
+        $replacement = Product::query()->create(['category_id' => $oldProduct->category_id, 'name' => 'Gel avec teinte', 'slug' => 'gel-'.str()->random(6), 'regular_price_millimes' => 15_000, 'stock_quantity' => null, 'has_variants' => true, 'is_active' => true]);
         $variant = $replacement->variants()->create(['sku' => 'GEL-NUDE', 'combination_key' => 'nude', 'stock_quantity' => 3, 'is_active' => true]);
         $actor = User::factory()->create();
 

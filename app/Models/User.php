@@ -27,6 +27,8 @@ class User extends Authenticatable
         'public_id',
         'role',
         'is_active',
+        'force_password_change',
+        'auth_version',
     ];
 
     /**
@@ -51,11 +53,19 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
             'disabled_at' => 'datetime',
+            'force_password_change' => 'boolean',
+            'auth_version' => 'integer',
+            'last_login_at' => 'datetime',
         ];
     }
 
     protected static function booted(): void
     {
         static::creating(fn (self $user) => $user->public_id ??= (string) Str::ulid());
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
     }
 }

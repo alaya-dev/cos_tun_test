@@ -4,13 +4,15 @@ namespace App\Domain\Commerce\Actions;
 
 use App\Domain\Catalog\Models\InventoryMovement;
 use App\Domain\Catalog\Models\Product;
-use App\Domain\Catalog\Models\ProductVariant;
+use App\Domain\Checkout\Services\ShippingCalculator;
 use App\Domain\Commerce\Models\Order;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ReconcileOrderItemsAction
 {
+    public function __construct(private readonly ShippingCalculator $shippingCalculator) {}
+
     /** @param array<int, array{product_public_id: string, variant_public_id: string|null, quantity: int}> $items */
     public function handle(Order $order, int $lockVersion, array $items, int $actorId): Order
     {
@@ -35,12 +37,7 @@ class ReconcileOrderItemsAction
                 ->get();
             $productsByPublicId = $lockedProducts->keyBy('public_id');
             $productsById = $lockedProducts->keyBy('id');
-            $variants = ProductVariant::query()
-                ->with('values.productOptionGroup')
-                ->whereIn('product_id', $lockedProducts->pluck('id'))
-                ->orderBy('id')
-                ->lockForUpdate()
-                ->get();
+            $variants = $lockedProducts->load(['variants.values.productOptionGroup'])->pluck('variants')->flatten(1)->sortBy('id')->values();
             $variantsById = $variants->keyBy('id');
             $variantsByPublicId = $variants->keyBy('public_id');
             foreach ($order->items as $old) {
@@ -66,7 +63,8 @@ class ReconcileOrderItemsAction
                 $target = $variant ?? $product;
                 if ($product->has_variants !== ($variant !== null) || ! $target->is_active || ($target->stock_quantity ?? 0) < $line['quantity']) {
                     throw ValidationException::withMessages(['items' => 'Stock insuffisant ou variante invalide.']);
-                } $regular = $product->regular_price_millimes;
+                }
+                $regular = $product->regular_price_millimes;
                 $effective = $product->promotional_price_millimes ?? $regular;
                 $before = $target->stock_quantity;
                 $target->decrement('stock_quantity', $line['quantity']);
@@ -75,8 +73,8 @@ class ReconcileOrderItemsAction
                 $subtotal += $effective * $line['quantity'];
                 $discount += ($regular - $effective) * $line['quantity'];
             }
-            $shipping = (int) config('commerce.shipping_fixed_fee_millimes');
-            $order->update(['subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'shipping_fee_millimes' => $shipping, 'total_millimes' => $subtotal + $shipping, 'lock_version' => $order->lock_version + 1]);
+            $shipping = $this->shippingCalculator->calculate($subtotal);
+            $order->update(['subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'shipping_fee_millimes' => $shipping['fee']['millimes'], 'total_millimes' => $subtotal + $shipping['fee']['millimes'], 'lock_version' => $order->lock_version + 1]);
 
             return $order->fresh(['items']) ?? $order;
         });

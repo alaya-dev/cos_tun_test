@@ -12,10 +12,14 @@
 - `roles-authorization-matrix.md`
 - `system-design.md`
 - `api-contracts.md`
-- `security-rules.md`
+- `security.md`
 - `privacy.md`
 - `design.md`
 - `quality-rules.md`
+
+## Declared source reading order
+
+Contributors MUST read `AGENTS.md`, then `docs/prd.md`, `docs/roles-authorization-matrix.md`, `docs/system-design.md`, `docs/api-contracts.md`, `docs/security.md`, `docs/privacy.md`, `docs/design.md`, `docs/quality-rules.md`, and finally this implementation plan before creating or implementing a specification.
 
 ---
 
@@ -234,7 +238,7 @@ Recommended:
 │   ├── roles-authorization-matrix.md
 │   ├── system-design.md
 │   ├── api-contracts.md
-│   ├── security-rules.md
+│   ├── security.md
 │   ├── privacy.md
 │   ├── design.md
 │   ├── quality-rules.md

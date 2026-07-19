@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Domain\Audit\Actions\RecordAuditEventAction;
 use App\Domain\Catalog\Actions\CreateProductAction;
 use App\Domain\Catalog\Actions\ReplaceProductVariantsAction;
 use App\Domain\Catalog\Actions\SwitchProductVariantModeAction;
@@ -83,11 +84,14 @@ class ProductController extends Controller
         return response()->json(['data' => $products]);
     }
 
-    public function store(Request $request, CreateProductAction $action): JsonResponse
+    public function store(Request $request, CreateProductAction $action, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['category_public_id' => ['required', 'ulid'], 'name' => ['required', 'string', 'max:200'], 'slug' => ['required', 'string', 'max:190', 'unique:products,slug'], 'regular_price_millimes' => ['required', 'integer', 'min:0'], 'promotional_price_millimes' => ['nullable', 'integer', 'min:0'], 'stock_quantity' => ['nullable', 'integer', 'min:0'], 'low_stock_threshold' => ['nullable', 'integer', 'min:0'], 'is_active' => ['required', 'boolean'], 'has_variants' => ['required', 'boolean'], 'short_description' => ['nullable', 'string'], 'full_description' => ['nullable', 'string'], 'published_at' => ['nullable', 'date'], 'seo_title' => ['nullable', 'string', 'max:255'], 'seo_description' => ['nullable', 'string', 'max:320'], 'option_groups' => ['nullable', 'array', 'max:5'], 'variants' => ['nullable', 'array', 'max:250']]);
 
-        return response()->json(['data' => $action->handle($data)], 201);
+        $product = $action->handle($data);
+        $audit->handle('catalog.product_created', $product, $request->user(), after: ['public_id' => $product->public_id]);
+
+        return response()->json(['data' => $product], 201);
     }
 
     public function show(Product $product): JsonResponse
@@ -95,7 +99,7 @@ class ProductController extends Controller
         return response()->json(['data' => $product->load('category', 'images.variant', 'optionGroups.values', 'variants.values')]);
     }
 
-    public function update(Request $request, Product $product): JsonResponse
+    public function update(Request $request, Product $product, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['category_public_id' => ['sometimes', 'ulid'], 'name' => ['sometimes', 'string', 'max:200'], 'slug' => ['sometimes', 'string', 'max:190', 'unique:products,slug,'.$product->id], 'short_description' => ['nullable', 'string'], 'full_description' => ['nullable', 'string'], 'regular_price_millimes' => ['sometimes', 'integer', 'min:0'], 'promotional_price_millimes' => ['nullable', 'integer', 'min:0'], 'stock_quantity' => ['nullable', 'integer', 'min:0'], 'low_stock_threshold' => ['nullable', 'integer', 'min:0'], 'is_active' => ['sometimes', 'boolean'], 'published_at' => ['nullable', 'date'], 'seo_title' => ['nullable', 'string', 'max:255'], 'seo_description' => ['nullable', 'string', 'max:320']]);
         if ($product->has_variants && (array_key_exists('stock_quantity', $data) || array_key_exists('low_stock_threshold', $data))) {
@@ -111,6 +115,7 @@ class ProductController extends Controller
         }
         $previousSlug = $product->slug;
         $product->update($data);
+        $audit->handle('catalog.product_updated', $product, $request->user(), after: ['fields' => array_keys($data)]);
         if (isset($data['slug']) && $data['slug'] !== $previousSlug) {
             DB::table('url_redirects')->updateOrInsert(['from_path' => '/produits/'.$previousSlug], ['to_path' => '/produits/'.$product->slug, 'updated_at' => now(), 'created_at' => now()]);
         }
@@ -118,10 +123,11 @@ class ProductController extends Controller
         return response()->json(['data' => $product->fresh()]);
     }
 
-    public function destroy(Product $product): JsonResponse
+    public function destroy(Request $request, Product $product, RecordAuditEventAction $audit): JsonResponse
     {
         $product->update(['is_active' => false]);
         $product->delete();
+        $audit->handle('catalog.product_archived', $product, $request->user());
 
         return response()->json(['data' => null]);
     }

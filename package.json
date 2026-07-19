@@ -7,12 +7,18 @@
         "dev": "vite",
         "lint": "eslint resources/js --max-warnings=0",
         "typecheck": "vue-tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "test:browser": "playwright test",
+        "check:asset-budgets": "node scripts/check-asset-budgets.mjs"
     },
     "devDependencies": {
+        "@playwright/test": "^1.61.1",
         "@sentry/vue": "^10.65.0",
         "@tailwindcss/vite": "^4.0.0",
+        "@types/node": "^26.1.1",
         "@typescript-eslint/parser": "^8.63.0",
+        "@vitest/coverage-v8": "^4.1.10",
         "@vue/test-utils": "^2.4.11",
         "axios": "^1.11.0",
         "concurrently": "^9.0.1",

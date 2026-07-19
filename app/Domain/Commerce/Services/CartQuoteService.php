@@ -3,9 +3,12 @@
 namespace App\Domain\Commerce\Services;
 
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Checkout\Services\ShippingCalculator;
 
 class CartQuoteService
 {
+    public function __construct(private readonly ShippingCalculator $shippingCalculator) {}
+
     /** @param array<int, array{product_public_id: string, variant_public_id: string|null, quantity: int}> $items
      * @return array<string, mixed>
      */
@@ -26,7 +29,7 @@ class CartQuoteService
             $subtotal += $line['effective_unit_price']['millimes'] * $item['quantity'];
             $canCheckout = $canCheckout && $line['is_available'];
         }
-        $shipping = $this->shippingFor($subtotal);
+        $shipping = $this->shippingCalculator->calculate($subtotal);
 
         return ['items' => $quotedItems, 'pricing' => ['regular_subtotal' => $this->money($regularSubtotal), 'product_discount' => $this->money($regularSubtotal - $subtotal), 'subtotal' => $this->money($subtotal), 'promo_code' => null, 'shipping' => $shipping, 'total' => $this->money($subtotal + $shipping['fee']['millimes'])], 'can_checkout' => $canCheckout && $items !== []];
     }
@@ -59,16 +62,6 @@ class CartQuoteService
         $variantLabel = $variant ? $variant->values->map(fn ($value) => ($value->productOptionGroup?->name ?: '').': '.$value->value)->implode(', ') : null;
 
         return ['product_public_id' => $item['product_public_id'], 'variant_public_id' => $item['variant_public_id'], 'name' => $product instanceof Product ? $product->name : 'Produit indisponible', 'variant_label' => $variantLabel, 'image_url' => $product?->images->first()?->publicUrl(), 'quantity_requested' => $item['quantity'], 'quantity_available' => $variant !== null ? $variant->stock_quantity : ($product instanceof Product ? $product->stock_quantity ?? 0 : 0), 'is_available' => $messages === [], 'regular_unit_price' => $this->money($regular), 'effective_unit_price' => $this->money($effective), 'line_total' => $this->money($effective * $item['quantity']), 'messages' => $messages];
-    }
-
-    /** @return array<string, mixed> */
-    private function shippingFor(int $subtotal): array
-    {
-        $threshold = config('commerce.shipping_free_threshold_millimes');
-        $free = is_int($threshold) && $subtotal >= $threshold;
-        $fee = $free ? 0 : (int) config('commerce.shipping_fixed_fee_millimes');
-
-        return ['is_free' => $free || $fee === 0, 'fee' => $this->money($fee, $fee === 0), 'free_threshold' => is_int($threshold) ? $this->money($threshold) : null];
     }
 
     /** @return array{millimes: int, formatted: string} */

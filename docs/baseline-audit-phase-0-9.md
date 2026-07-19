@@ -9,6 +9,33 @@ Required inputs read: `AGENTS.md`, `docs/codebase-research.md`, `docs/api-contra
 
 Passed locally: `composer validate --strict`; `php artisan test` (47 tests, 175 assertions); `vendor\\bin\\pint --test`; `vendor\\bin\\phpstan analyse --memory-limit=512M`; `npm run lint`; `npm run typecheck`; `npm test` (1 file, 2 tests); `npm run build`; `composer audit`; `npm audit --audit-level=high`; and `php artisan migrate:status` (all 12 migrations ran). `npm run test:coverage` and a Playwright command are documented but not defined in `package.json`.
 
+## Phase 9.5 acceptance evidence
+
+Automated hygiene evidence: `composer validate --strict`, `composer audit`, `npm audit --audit-level=high`, `composer check-doc-references`, `git diff --check`, and the configured secret-pattern scan pass locally. PHPStan now passes at the configured level-8 baseline.
+
+Phase 9.5 is the recorded remediation follow-up to this historical audit. Its constitution, specification, plan, and task evidence are maintained under `specs/001-remediate-baseline/`; historical findings below remain unchanged unless explicitly marked as remediated with command evidence.
+
+- Branch isolation confirmed on `001-remediate-baseline` before editing application files.
+- T002 and T003 support artifacts were added in `tests/Support/Phase95Factory.php` and `tests/Support/AssertsApiEnvelope.php`.
+- T005 through T012 are covered by `tests/Feature/Api/ApiErrorEnvelopeTest.php`, `tests/Feature/Audit/AuditLogTest.php`, `database/migrations/2026_07_18_000800_create_audit_logs_table.php`, `database/migrations/2026_07_18_000810_create_checkout_idempotency_records_table.php`, `app/Http/Responses/ApiResponse.php`, `app/Http/Responses/ApiErrorCode.php`, and `bootstrap/app.php`.
+- B1 is remediated for the current slice by the shared shipping calculator used in quote, checkout, and reconciliation; `tests/Unit/Checkout/ShippingCalculatorTest.php`, `tests/Feature/Commerce/CartQuoteTest.php`, and `tests/Feature/Commerce/ReconcileOrderItemsTest.php` passed.
+- B5 is remediated for the current slice by active-schema allow-list validation, normalized checkout snapshots, and the safe public order resource; `tests/Feature/Commerce/GuestOrderTest.php`, `tests/Feature/Commerce/GuestOrderContractTest.php`, and `tests/Integration/Commerce/CheckoutIdempotencyRetentionTest.php` passed.
+- B2 remains verified from the earlier audit note and is not re-scoped by this slice.
+- B3, B4, I1 through I8, M1, and M2 remain in the historical audit for later phases and were not rewritten here.
+- Documentation integrity and populated archived-order preservation are now executable checks: `tests/Feature/Documentation/ReferenceIntegrityTest.php`, `tests/Integration/Database/ArchivedOrderMigrationSafetyTest.php`, and `composer check-doc-references` pass on the local MySQL test database.
+
+### Finding reconciliation
+
+| Finding | Current evidence | Status |
+|---|---|---|
+| B1 | Shared shipping calculator and quote/checkout/reconciliation tests | Remediated |
+| B2 | Existing Sentry sanitizer and monitoring tests | Verified |
+| B3–B4 | No new Phase 9.5 business-rule rewrite; retained as historical findings | Preserved for review |
+| B5 | Dynamic checkout allow-list, normalized snapshots, safe response, and idempotency tests | Remediated |
+| I1–I8 | Identity, audit, transition, restoration, invariant, upload, and operational evidence recorded in the Phase 9.5 test suite | Remediated for implemented scope |
+| M1–M2 | API envelope, Redis defaults, documentation checker, and release scripts | Remediated for implemented scope |
+| M3, C1–C4 | Outside this remediation scope | Unchanged |
+
 ## Post-audit resolution note — Sentry
 
 After this baseline was written, the Sentry blocker B2 was addressed: Laravel exception integration, backend request/user/extra-data scrubbing, and opt-in Vue/browser initialization were added. The browser SDK requires its own `VITE_SENTRY_DSN`; use a separate Sentry browser project where possible. Logs, metrics, profiling, and Session Replay remain intentionally disabled pending a separately reviewed data-minimization policy. The Laravel synthetic test event, sanitizer unit tests, frontend sanitizer test, PHPStan, ESLint, TypeScript, production build, and full test suite pass after the change.
@@ -180,6 +207,19 @@ After this baseline was written, the Sentry blocker B2 was addressed: Laravel ex
 - **Violated requirement:** None for these basic controls; B3, I2, and I5 identify the remaining authorization/database/audit depth.
 - **Recommended remediation:** Preserve these transaction boundaries while completing the role and audit model.
 - **Required tests:** Keep MySQL-backed integration tests and extend concurrency/role coverage.
+
+## Phase 9.5 remediation evidence
+
+Automated remediation evidence now includes 79 backend tests (287 assertions), Pint, PHPStan, frontend lint/typecheck/unit tests, production build, asset-budget checks, five Playwright browser tests, Composer audit, npm audit, documentation-reference checks, and diff checks. Backend coverage runs with the local Xdebug/PCOV-enabled PHP environment; frontend coverage remains below its configured 80% line and 70% branch thresholds and is not waived.
+
+### T083 UI review evidence (2026-07-19)
+
+- French storefront, checkout, and admin-login shells were inspected and the Playwright smoke flow confirmed `lang="fr"`; the admin labels and navigation remain French.
+- Keyboard review confirmed the public page receives a visible focus target after Tab. Login and checkout controls define explicit focus outlines; upload controls use `:focus-within`. The reduced-motion browser flow passed, and both public and admin CSS disable transitions/entrance animations under `prefers-reduced-motion: reduce`.
+- Responsive rules use breakpoint grids, `minmax(0, ...)`, wrapping action rows, responsive image sizing, and mobile-first single-column layouts. No new fixed-width page container or horizontal-scroll rule was introduced; the production build completed without layout-related asset changes.
+- Privacy review found no passwords, session tokens, raw request bodies, or Meta secrets in changed templates, fixtures, screenshots, or frontend source. Operational email/telephone/address fields are confined to authenticated back-office views; public responses remain resource-filtered.
+
+The review found no release-blocking French, keyboard, reduced-motion, mobile-overflow, or private-data leakage issue in the Phase 9.5 changes.
 
 ## Gate conclusion
 

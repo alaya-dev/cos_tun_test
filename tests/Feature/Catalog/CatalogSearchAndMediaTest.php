@@ -10,8 +10,10 @@ use App\Domain\Catalog\Models\ProductImage;
 use App\Jobs\ProcessProductImage;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -70,6 +72,30 @@ class CatalogSearchAndMediaTest extends TestCase
         $this->actingAs($admin, 'sanctum')->postJson('/api/v1/admin/products/'.$product->public_id.'/images', [
             'image' => UploadedFile::fake()->createWithContent('not-an-image.jpg', 'not an image'),
         ])->assertStatus(422);
+    }
+
+    public function test_product_image_upload_route_has_named_throttle_and_pixel_ceiling(): void
+    {
+        $route = Route::getRoutes()->match(Request::create('/api/v1/admin/products/test/images', 'POST'));
+        $this->assertContains('throttle:media-upload', $route->middleware());
+        $this->assertStringContainsString('20_000_000', file_get_contents(base_path('app/Http/Controllers/Api/Admin/ProductImageController.php')));
+    }
+
+    public function test_product_image_upload_throttle_returns_retry_after(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage-throttle', 'is_active' => true]);
+        $product = Product::query()->create(['category_id' => $category->id, 'name' => 'Crème throttle', 'slug' => 'creme-throttle', 'regular_price_millimes' => 12_500, 'stock_quantity' => 3, 'is_active' => false]);
+        $limited = null;
+        for ($attempt = 0; $attempt < 22; $attempt++) {
+            $response = $this->actingAs($admin, 'sanctum')->postJson('/api/v1/admin/products/'.$product->public_id.'/images', []);
+            if ($response->status() === 429) {
+                $limited = $response;
+                break;
+            }
+        }
+        self::assertNotNull($limited);
+        $limited->assertHeader('Retry-After');
     }
 
     public function test_admin_can_assign_images_to_the_gallery_primary_slot_or_a_variant(): void

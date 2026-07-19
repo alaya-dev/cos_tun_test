@@ -2,8 +2,10 @@
 
 namespace App\Domain\Commerce\Actions;
 
-use App\Domain\Catalog\Models\InventoryMovement;
+use App\Domain\Audit\Actions\RecordAuditEventAction;
 use App\Domain\Commerce\Models\Order;
+use App\Domain\Orders\Actions\RestoreOrderStockOnceAction;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -11,6 +13,8 @@ class TransitionOrderStatusAction
 {
     /** @var array<string, array<int, string>> */
     private const TRANSITIONS = ['nouvelle' => ['confirmee', 'annulee'], 'confirmee' => ['livree', 'echec_livraison'], 'livree' => ['retournee']];
+
+    public function __construct(private readonly RestoreOrderStockOnceAction $restoreStock, private readonly RecordAuditEventAction $audit) {}
 
     public function handle(Order $order, string $toStatus, ?string $reason, int $actorId, bool $restockReturn = false): Order
     {
@@ -26,26 +30,13 @@ class TransitionOrderStatusAction
             $order->update(['status' => $toStatus, 'lock_version' => $order->lock_version + 1]);
             DB::table('order_status_history')->insert(['order_id' => $order->id, 'from_status' => $fromStatus, 'to_status' => $toStatus, 'reason' => $reason, 'changed_by' => $actorId, 'created_at' => now()]);
             if (in_array($toStatus, ['annulee', 'echec_livraison'], true) || ($toStatus === 'retournee' && $restockReturn)) {
-                $this->restoreStockOnce($order, $actorId, $toStatus);
+                $this->restoreStock->handle($order, $actorId, $toStatus);
             }
 
-            return $order->fresh() ?? $order;
+            $updated = $order->fresh() ?? $order;
+            $this->audit->handle('order.status_changed', $updated, User::query()->find($actorId), after: ['from_status' => $fromStatus, 'to_status' => $toStatus, 'reason' => $reason]);
+
+            return $updated;
         });
-    }
-
-    private function restoreStockOnce(Order $order, int $actorId, string $reason): void
-    {
-        if (DB::table('inventory_movements')->where('reason', 'Restauration commande '.$order->public_reference)->exists()) {
-            return;
-        }
-        foreach ($order->items()->with(['product', 'variant'])->get() as $item) {
-            $target = $item->variant ?? $item->product;
-            if (! $target) {
-                continue;
-            }
-            $before = $target->stock_quantity;
-            $target->increment('stock_quantity', $item->quantity);
-            InventoryMovement::query()->create(['product_id' => $item->product_id, 'product_variant_id' => $item->product_variant_id, 'actor_user_id' => $actorId, 'type' => 'order_restoration', 'quantity_delta' => $item->quantity, 'quantity_before' => $before, 'quantity_after' => $before + $item->quantity, 'reason' => 'Restauration commande '.$order->public_reference]);
-        }
     }
 }

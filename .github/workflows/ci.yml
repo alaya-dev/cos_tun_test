@@ -22,5 +22,15 @@ jobs:
       - run: ./vendor/bin/pint --test
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm test -- --run
+      - run: npm run test:coverage
       - run: npm run build
+      - run: npm run check:asset-budgets
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
       - run: php artisan test
+      - run: composer test:coverage
+      - run: composer audit
+      - run: npm audit --audit-level=high
+      - run: if git grep -nE 'AKIA[0-9A-Z]{16}|-----BEGIN .*PRIVATE KEY-----|sk_live_' -- ':!.env.example' ':!.github/workflows/ci.yml'; then echo 'Potential secret detected'; exit 1; fi
+      - run: composer check-doc-references

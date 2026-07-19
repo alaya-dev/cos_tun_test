@@ -12,6 +12,8 @@ import OrderDetailView from './order-detail';
 import OrdersView from './orders';
 import ProductEditorView from './product-editor';
 import ProductsView from './products';
+import UsersView from './users';
+import AuditLogsView from './audit-logs';
 import { configureSentry } from '../sentry';
 import {
     dismissError,
@@ -61,6 +63,8 @@ const Shell = {
           <RouterLink to="/categories" aria-label="Catégories"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12V5h7l9 9-7 7-9-9Z"/><path d="M8 8h.01"/></svg><span>Catégories</span></RouterLink>
           <RouterLink to="/orders" aria-label="Commandes"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l1 13H5L6 7Z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg><span>Commandes</span></RouterLink>
           <RouterLink to="/inventory" aria-label="Inventaire"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5v9l-9 5-9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v9"/></svg><span>Inventaire</span></RouterLink>
+          <RouterLink to="/users" aria-label="Utilisateurs"><span>Utilisateurs</span></RouterLink>
+          <RouterLink to="/audit-logs" aria-label="Journal d’audit"><span>Journal d’audit</span></RouterLink>
         </nav>
         <footer class="admin-profile"><span>Administration</span><button class="text-link" type="button" @click="logout">Déconnexion</button></footer>
       </aside>
@@ -100,6 +104,8 @@ const router = createRouter({
         { path: '/orders', component: OrdersView },
         { path: '/orders/:reference', component: OrderDetailView },
         { path: '/inventory', component: InventoryView },
+        { path: '/users', component: UsersView },
+        { path: '/audit-logs', component: AuditLogsView },
     ],
 });
 

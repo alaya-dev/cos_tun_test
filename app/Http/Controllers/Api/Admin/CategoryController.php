@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Domain\Audit\Actions\RecordAuditEventAction;
 use App\Domain\Catalog\Models\Category;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
@@ -29,12 +30,15 @@ class CategoryController extends Controller
         return response()->json(['data' => $categories]);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(Request $request, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $this->validated($request);
         $data['slug'] ??= Str::slug($data['name']);
 
-        return response()->json(['data' => Category::query()->create($data)], 201);
+        $category = Category::query()->create($data);
+        $audit->handle('catalog.category_created', $category, $request->user());
+
+        return response()->json(['data' => $category], 201);
     }
 
     public function show(Category $category): JsonResponse
@@ -42,7 +46,7 @@ class CategoryController extends Controller
         return response()->json(['data' => $category]);
     }
 
-    public function update(Request $request, Category $category): JsonResponse
+    public function update(Request $request, Category $category, RecordAuditEventAction $audit): JsonResponse
     {
         $oldSlug = $category->slug;
         $data = $this->validated($request, false);
@@ -56,15 +60,18 @@ class CategoryController extends Controller
             DB::table('url_redirects')->updateOrInsert(['from_path' => '/categories/'.$oldSlug], ['to_path' => '/categories/'.$category->slug, 'updated_at' => now(), 'created_at' => now()]);
         }
 
+        $audit->handle('catalog.category_updated', $category, $request->user(), after: ['fields' => array_keys($data)]);
+
         return response()->json(['data' => $category->fresh()]);
     }
 
-    public function destroy(Category $category): JsonResponse
+    public function destroy(Request $request, Category $category, RecordAuditEventAction $audit): JsonResponse
     {
         if ($category->products()->exists()) {
             return response()->json(['code' => 'CATEGORY_IN_USE', 'message' => 'Cette catégorie contient des produits.'], 409);
         }
         $category->delete();
+        $audit->handle('catalog.category_deleted', $category, $request->user());
 
         return response()->json(['data' => null]);
     }

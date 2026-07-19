@@ -51,6 +51,8 @@
             "@php artisan config:clear --ansi",
             "@php artisan test"
         ],
+        "check-doc-references": "@php scripts/check-doc-references.php",
+        "test:coverage": "@php artisan test --coverage --min=70",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi"

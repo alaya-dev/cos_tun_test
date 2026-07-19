@@ -2,8 +2,10 @@
 
 namespace App\Domain\Commerce\Models;
 
+use App\Domain\Checkout\Models\CheckoutIdempotencyRecord;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Order extends Model
@@ -33,6 +35,12 @@ class Order extends Model
     public function checkoutValues(): HasMany
     {
         return $this->hasMany(OrderCheckoutValue::class);
+    }
+
+    /** @return HasOne<CheckoutIdempotencyRecord, $this> */
+    public function checkoutIdempotencyRecord(): HasOne
+    {
+        return $this->hasOne(CheckoutIdempotencyRecord::class);
     }
 
     /** @return HasMany<OrderStatusHistory, $this> */

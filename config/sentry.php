@@ -1,5 +1,7 @@
 <?php
 
+use App\Support\Observability\SentryEventSanitizer;
+
 /**
  * Sentry Laravel SDK configuration file.
  *
@@ -53,9 +55,9 @@ return [
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#send_default_pii
     'send_default_pii' => env('SENTRY_SEND_DEFAULT_PII', false),
 
-    'before_send' => [\App\Support\Observability\SentryEventSanitizer::class, 'sanitize'],
+    'before_send' => [SentryEventSanitizer::class, 'sanitize'],
 
-    'before_send_transaction' => [\App\Support\Observability\SentryEventSanitizer::class, 'sanitize'],
+    'before_send_transaction' => [SentryEventSanitizer::class, 'sanitize'],
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore_exceptions
     // 'ignore_exceptions' => [],

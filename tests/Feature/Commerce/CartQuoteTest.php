@@ -4,12 +4,21 @@ namespace Tests\Feature\Commerce;
 
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
+use App\Domain\Commerce\Actions\CreateGuestOrderAction;
+use App\Domain\Commerce\Models\CheckoutField;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Tests\TestCase;
 
 class CartQuoteTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutMiddleware(ThrottleRequests::class);
+    }
 
     public function test_quote_uses_server_price_and_does_not_reserve_stock(): void
     {
@@ -26,6 +35,18 @@ class CartQuoteTest extends TestCase
 
         $this->postJson('/api/v1/public/cart/quote', ['items' => [['product_public_id' => $product->public_id, 'variant_public_id' => null, 'quantity' => 2]]])
             ->assertOk()->assertJsonPath('data.items.0.is_available', false)->assertJsonPath('data.can_checkout', false)->assertJsonPath('data.items.0.quantity_available', 1);
+    }
+
+    public function test_quote_and_checkout_totals_stay_equal_for_the_same_basket(): void
+    {
+        $product = $this->product(3, 15_000, 10_000);
+        $payload = $this->payload($product, 2);
+
+        $quote = $this->postJson('/api/v1/public/cart/quote', ['items' => $payload['items']])->assertOk();
+        $order = $this->withHeader('Idempotency-Key', '4af95712-4d91-4c57-8d29-917324200055')->postJson('/api/v1/public/orders', $payload)->assertCreated();
+
+        $this->assertSame($quote->json('data.pricing.total.millimes'), $order->json('data.order.pricing.total.millimes'));
+        $this->assertSame($quote->json('data.pricing.shipping.fee.millimes'), $order->json('data.order.pricing.shipping_fee.millimes'));
     }
 
     public function test_variant_product_requires_a_matching_active_variant(): void
@@ -46,5 +67,13 @@ class CartQuoteTest extends TestCase
         $category = Category::query()->create(['name' => 'Corps', 'slug' => 'corps-'.str()->random(6), 'is_active' => true]);
 
         return Product::query()->create(['category_id' => $category->id, 'name' => 'Baume', 'slug' => 'baume-'.str()->random(6), 'regular_price_millimes' => $regular, 'promotional_price_millimes' => $promo, 'stock_quantity' => $stock, 'is_active' => true, 'has_variants' => false, 'published_at' => now()]);
+    }
+
+    /** @return array<string, mixed> */
+    private function payload(Product $product, int $quantity = 2): array
+    {
+        $fields = CheckoutField::query()->where('is_active', true)->orderBy('sort_order')->get()->map(fn (CheckoutField $field) => $field->only(['key', 'label', 'type', 'is_required', 'options', 'sort_order']))->all();
+
+        return ['checkout_schema_version' => app(CreateGuestOrderAction::class)->schemaVersion($fields), 'customer' => ['full_name' => 'Client Test', 'phone' => '22 123 456', 'city' => 'Tunis', 'address' => '10 rue de la Paix'], 'items' => [['product_public_id' => $product->public_id, 'variant_public_id' => null, 'quantity' => $quantity]]];
     }
 }

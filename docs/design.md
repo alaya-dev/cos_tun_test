@@ -6,7 +6,7 @@
 **Application interface language:** French only  
 **Platforms:** Public storefront and private back office  
 **Primary target:** Mobile-first Tunisian cosmetics e-commerce  
-**Related documents:** `prd.md`, `roles-authorization-matrix.md`, `system-design.md`, `api-contracts.md`, `security-rules.md`, `privacy.md`, `quality-rules.md`
+**Related documents:** `prd.md`, `roles-authorization-matrix.md`, `system-design.md`, `api-contracts.md`, `security.md`, `privacy.md`, `quality-rules.md`
 
 ---
 

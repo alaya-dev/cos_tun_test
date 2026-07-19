@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Domain\Audit\Actions\RecordAuditEventAction;
 use App\Domain\Commerce\Actions\ReconcileOrderItemsAction;
 use App\Domain\Commerce\Actions\TransitionOrderStatusAction;
 use App\Domain\Commerce\Actions\UpdateOrderCustomerAction;
@@ -58,11 +59,17 @@ class OrderController extends Controller
         return response()->json(['data' => $action->handle($order, $data['to_status'], $data['reason'] ?? null, $actor->id, $data['restock_items'] ?? false)]);
     }
 
-    public function update(Request $request, Order $order, UpdateOrderCustomerAction $action): JsonResponse
+    public function update(Request $request, Order $order, UpdateOrderCustomerAction $action, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['lock_version' => ['required', 'integer', 'min:1'], 'customer.full_name' => ['required', 'string', 'between:2,180'], 'customer.phone' => ['required', 'string', 'max:40'], 'customer.city' => ['required', 'string', 'between:2,160'], 'customer.address' => ['required', 'string', 'between:5,2000']]);
         try {
-            return response()->json(['data' => $action->handle($order, $data['lock_version'], $data['customer'])]);
+            $before = $order->only(['customer_name', 'customer_phone', 'customer_city', 'customer_address']);
+            $result = $action->handle($order, $data['lock_version'], $data['customer']);
+            $fresh = $order->fresh();
+            abort_unless($fresh !== null, 500);
+            $audit->handle('order.customer_updated', $fresh, $request->user(), before: $before, after: $fresh->only(array_keys($before)));
+
+            return response()->json(['data' => $result]);
         } catch (ValidationException $exception) {
             $errors = $exception->errors();
             $message = collect($errors)->flatten()->first() ?? 'La commande ne peut pas Ãªtre modifiÃ©e.';
@@ -71,7 +78,7 @@ class OrderController extends Controller
         }
     }
 
-    public function updateItems(Request $request, Order $order, ReconcileOrderItemsAction $action): JsonResponse
+    public function updateItems(Request $request, Order $order, ReconcileOrderItemsAction $action, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['lock_version' => ['required', 'integer', 'min:1'], 'items' => ['required', 'array', 'min:1', 'max:100'], 'items.*.product_public_id' => ['required', 'ulid'], 'items.*.variant_public_id' => ['nullable', 'ulid'], 'items.*.quantity' => ['required', 'integer', 'between:1,99']]);
         $actor = $request->user();
@@ -79,13 +86,16 @@ class OrderController extends Controller
             abort(401);
         }
         try {
-            return response()->json(['data' => $action->handle($order, $data['lock_version'], $data['items'], $actor->id)]);
+            $result = $action->handle($order, $data['lock_version'], $data['items'], $actor->id);
+            $audit->handle('order.items_updated', $order, $actor, after: ['item_count' => count($data['items'])]);
+
+            return response()->json(['data' => $result]);
         } catch (ValidationException $exception) {
             return response()->json(['code' => 'ORDER_UPDATE_CONFLICT', 'message' => $exception->getMessage()], 409);
         }
     }
 
-    public function storeNote(Request $request, Order $order): JsonResponse
+    public function storeNote(Request $request, Order $order, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['body' => ['required', 'string', 'between:1,5000']]);
         $actor = $request->user();
@@ -93,10 +103,13 @@ class OrderController extends Controller
             abort(401);
         }
 
-        return response()->json(['data' => $order->notes()->create(['user_id' => $actor->id, 'body' => $data['body'], 'created_at' => now()])], 201);
+        $note = $order->notes()->create(['user_id' => $actor->id, 'body' => $data['body'], 'created_at' => now()]);
+        $audit->handle('order.note_added', $order, $actor, after: ['note_id' => $note->getKey()]);
+
+        return response()->json(['data' => $note], 201);
     }
 
-    public function bulkArchive(Request $request): JsonResponse
+    public function bulkArchive(Request $request, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['references' => ['required', 'array', 'min:1', 'max:100'], 'references.*' => ['ulid', 'distinct']]);
         $archived = DB::transaction(function () use ($data): int {
@@ -108,10 +121,12 @@ class OrderController extends Controller
             return $orders->count();
         });
 
+        $audit->handle('order.bulk_archived', Order::query()->whereIn('public_reference', $data['references'])->firstOrFail(), $request->user(), after: ['count' => $archived]);
+
         return response()->json(['data' => ['archived' => $archived]]);
     }
 
-    public function bulkRestore(Request $request): JsonResponse
+    public function bulkRestore(Request $request, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['references' => ['required', 'array', 'min:1', 'max:100'], 'references.*' => ['ulid', 'distinct']]);
         $restored = DB::transaction(function () use ($data): int {
@@ -122,10 +137,12 @@ class OrderController extends Controller
             return $orders->count();
         });
 
+        $audit->handle('order.bulk_restored', Order::query()->whereIn('public_reference', $data['references'])->firstOrFail(), $request->user(), after: ['count' => $restored]);
+
         return response()->json(['data' => ['restored' => $restored]]);
     }
 
-    public function bulkTransition(Request $request, TransitionOrderStatusAction $action): JsonResponse
+    public function bulkTransition(Request $request, TransitionOrderStatusAction $action, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['references' => ['required', 'array', 'min:1', 'max:100'], 'references.*' => ['ulid', 'distinct'], 'to_status' => ['required', 'in:confirmee,annulee,livree,echec_livraison,retournee']]);
         $actor = $request->user();
@@ -158,6 +175,8 @@ class OrderController extends Controller
 
             return $orders->count();
         });
+
+        $audit->handle('order.bulk_transitioned', Order::query()->whereIn('public_reference', $data['references'])->firstOrFail(), $actor, after: ['count' => $updated, 'to_status' => $data['to_status']]);
 
         return response()->json(['data' => ['updated' => $updated]]);
     }

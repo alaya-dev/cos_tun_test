@@ -9,7 +9,7 @@
 **Architecture:** Laravel modular monolith, Blade storefront with Vue islands, Vue 3 admin SPA  
 **Monitoring:** Sentry only  
 **Deployment:** Deployment-neutral; Docker and non-Docker VPS plans supported  
-**Related documents:** `prd.md`, `roles-authorization-matrix.md`, `system-design.md`, `api-contracts.md`, `security-rules.md`, `privacy.md`
+**Related documents:** `prd.md`, `roles-authorization-matrix.md`, `system-design.md`, `api-contracts.md`, `security.md`, `privacy.md`
 
 ---
 
@@ -49,7 +49,7 @@ Security, performance, and data integrity have priority over development speed.
 When documents conflict, use:
 
 1. Approved architecture or security exception
-2. `security-rules.md`
+2. `security.md`
 3. `privacy.md`
 4. `roles-authorization-matrix.md`
 5. `api-contracts.md`
@@ -960,6 +960,10 @@ Recommended:
 
 ## 15.5 Coverage thresholds
 
+### Archived-order migration recovery
+
+Never run the rollback for `2026_07_18_000700_add_archived_at_to_orders.php` on populated production data. Export and verify archived timestamps first; if rollback has already removed the column, restore it with a forward migration, reload the verified timestamps, and record the recovery before continuing.
+
 Coverage is a guardrail, not the goal.
 
 Backend minimum:
@@ -1048,7 +1052,7 @@ Rules:
 
 # 19. Security Quality Gates
 
-Every change must comply with `security-rules.md`.
+Every change must comply with `security.md`.
 
 CI must run:
 

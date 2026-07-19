@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Domain\Audit\Actions\RecordAuditEventAction;
 use App\Domain\Catalog\Actions\AdjustInventoryAction;
 use App\Domain\Catalog\Models\InventoryMovement;
 use App\Domain\Catalog\Models\Product;
@@ -34,7 +35,7 @@ class InventoryController extends Controller
         return response()->json(['data' => $query->paginate($data['per_page'] ?? 25)]);
     }
 
-    public function adjust(Request $request, Product $product, AdjustInventoryAction $action): JsonResponse
+    public function adjust(Request $request, Product $product, AdjustInventoryAction $action, RecordAuditEventAction $audit): JsonResponse
     {
         $data = $request->validate(['variant_public_id' => ['nullable', 'ulid'], 'quantity_delta' => ['required', 'integer', 'not_in:0', 'between:-100000,100000'], 'reason' => ['required', 'string', 'between:3,500']]);
         $actor = $request->user();
@@ -42,6 +43,7 @@ class InventoryController extends Controller
             abort(401);
         }
         $action->handle($product, $data['variant_public_id'] ?? null, $data['quantity_delta'], $data['reason'], $actor->id);
+        $audit->handle('inventory.adjusted', $product, $actor, after: ['quantity_delta' => $data['quantity_delta'], 'variant_public_id' => $data['variant_public_id'] ?? null]);
 
         return response()->json(['data' => null]);
     }

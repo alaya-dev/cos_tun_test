@@ -6,7 +6,7 @@
 
 - Read repository guidance in [AGENTS.md](../AGENTS.md) and the available product, architecture, API, security, privacy, design, quality, and implementation-plan documents under `docs/`.
 - `.specify/memory/constitution.md` is not present in this checkout.
-- `docs/security-rules.md` is not present; [security.md](security.md) exists and is titled `Security Rules and Controls`.
+- `docs/security.md` is the authoritative security control document and is titled `Security Rules and Controls`.
 - [implementation-plan.md](implementation-plan.md) names Phases 0 through 17. Its Phase 9 is `Back-Office Order Operations` (line 1399); Phases 10 through 13 cover promotions/content, complaints, Meta, and diagnostics, respectively.
 
 ## Current architecture

@@ -3664,7 +3664,7 @@ This document is the source of truth for security controls.
 Priority when documents conflict:
 
 1. Explicit approved security exception
-2. `security-rules.md`
+2. `security.md`
 3. `roles-authorization-matrix.md`
 4. `api-contracts.md`
 5. `system-design.md`

@@ -410,12 +410,35 @@ A customer must select all required variant values before adding a variant-based
 
 ## 5.1 Default Homepage Sections
 
-The default homepage supports:
+The homepage is a mobile-first, server-rendered Blade page. Vue is used only for approved interactive islands such as the hero carousel, search, cart quantity badge, and optional horizontal enhancements.
 
-1. Hero or promotional banner
-2. Categories
-3. New products
-4. All products
+The default homepage supports the following section order:
+
+1. Announcement bar
+2. Main header
+3. Hero carousel
+4. Circular category explorer
+5. Best-sellers introduction
+6. Featured products
+7. Large visual category tiles
+8. Must-haves editorial section
+9. Quality and reassurance
+10. Social gallery
+11. Brand and SEO content
+12. Footer
+13. Optional floating cart
+
+Functional requirements:
+
+* The announcement bar displays configurable business or delivery messaging from backend settings.
+* The main header exposes Accueil, Boutique, dynamic category or ritual links, search, and a cart quantity badge.
+* The hero carousel supports configurable slides, separate desktop and mobile images, limited active slides, and a slow reduced-motion-aware autoplay.
+* The circular category explorer uses back-office-managed categories and images.
+* Featured products show configured promotional content and respect product-variant behavior.
+* Reassurance content uses only approved business claims.
+* Social gallery images link only to approved social URLs.
+* Brand and SEO content is editable in French and remains server-rendered.
+* The optional floating cart must not obscure checkout actions, cookie controls, or the footer.
 
 ## 5.2 Custom Product Sections
 
@@ -444,10 +467,12 @@ The Super Admin can manage storefront content without modifying code.
 
 This includes:
 
-* Hero banners
+* Homepage section order and activation state
+* Hero slide content and images
 * Promotional images
 * Announcement-bar text
-* Homepage-section order
+* Category explorer imagery and labels
+* Editorial and product section content
 * Footer content
 * Phone number
 * Email address

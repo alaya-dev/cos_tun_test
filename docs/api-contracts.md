@@ -10,7 +10,7 @@
 **Backend:** Laravel modular monolith  
 **Consumers:** Server-rendered storefront, Vue storefront islands, Vue back-office SPA  
 **Deployment:** Deployment-neutral; valid for both Docker and non-Docker VPS plans  
-**Related documents:** `prd.md`, `roles-authorization-matrix.md`, `system-design.md`, `security-rules.md`
+**Related documents:** `prd.md`, `roles-authorization-matrix.md`, `system-design.md`, `security.md`
 
 ---
 
@@ -3106,7 +3106,7 @@ Initial baseline:
 
 ## 37. Rate-Limit Contract
 
-Exact numbers belong in `security-rules.md`, but API behavior is fixed.
+Exact numbers belong in `security.md`, but API behavior is fixed.
 
 Rate-limit scopes include:
 
