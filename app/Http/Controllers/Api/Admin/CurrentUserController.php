@@ -21,7 +21,10 @@ class CurrentUserController extends Controller
 
     public function password(Request $request, RecordAuditEventAction $audit): JsonResponse
     {
-        $data = $request->validate(['current_password' => ['required', 'string'], 'password' => ['required', 'string', 'min:15', 'confirmed']]);
+        $data = $request->validate(['current_password' => ['required', 'string'], 'password' => ['required', 'string', 'min:8', 'confirmed']], [
+            'password.min' => 'Le nouveau mot de passe doit contenir au moins 8 caractères.',
+            'password.confirmed' => 'La confirmation du nouveau mot de passe ne correspond pas.',
+        ]);
         $user = $request->user();
         abort_unless($user !== null, 401);
         if (! Hash::check($data['current_password'], $user->password)) {

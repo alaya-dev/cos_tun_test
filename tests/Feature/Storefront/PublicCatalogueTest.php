@@ -91,6 +91,19 @@ class PublicCatalogueTest extends TestCase
             ->assertSee('serum-nuance-30ml.webp', false);
     }
 
+    public function test_product_gallery_exposes_an_accessible_thumbnail_rail_when_multiple_images_exist(): void
+    {
+        $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage', 'is_active' => true]);
+        $product = $this->product($category, 'Sérum galerie', 'serum-galerie');
+        $product->images()->create(['path' => 'products/serum-galerie-1.webp', 'processing_status' => 'ready', 'is_primary' => true]);
+        $product->images()->create(['path' => 'products/serum-galerie-2.webp', 'processing_status' => 'ready', 'is_primary' => false]);
+
+        $this->get('/produits/serum-galerie')
+            ->assertOk()
+            ->assertSee('data-gallery-thumbnails', false)
+            ->assertSee('aria-label="Autres images du produit"', false);
+    }
+
     public function test_homepage_cache_is_invalidated_when_a_product_changes(): void
     {
         $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage', 'is_active' => true]);

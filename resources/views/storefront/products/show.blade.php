@@ -16,8 +16,8 @@
         <nav class="breadcrumb" aria-label="Fil d’Ariane"><a href="{{ route('storefront.home') }}">Accueil</a><span>/</span><a href="{{ route('storefront.category', $product->category->slug) }}">{{ $product->category->name }}</a><span>/</span><span aria-current="page">{{ $product->name }}</span></nav>
         <div class="product-layout" data-product-detail data-product-public-id="{{ $product->public_id }}" data-product-variants='@json($variantsForClient)'>
             <div class="product-gallery" data-gallery>
+                @if($product->images->count() > 1)<div class="gallery-thumbnails" data-gallery-thumbnails tabindex="0" aria-label="Autres images du produit">@foreach($product->images as $image)<button type="button" data-gallery-image="{{ $image->public_url }}" aria-label="Voir l’image {{ $loop->iteration }}"><img src="{{ $image->public_url }}" width="96" height="96" alt=""></button>@endforeach</div>@endif
                 <div class="product-main-image">@if($primaryImage && $primaryImage->public_url)<img src="{{ $primaryImage->public_url }}" width="{{ $primaryImage->width }}" height="{{ $primaryImage->height }}" alt="{{ $primaryImage->alt_text ?: $product->name }}" data-gallery-main>@else<span class="product-image-placeholder">PC</span>@endif</div>
-                @if($product->images->count() > 1)<div class="gallery-thumbnails">@foreach($product->images as $image)<button type="button" data-gallery-image="{{ $image->public_url }}" aria-label="Voir l’image {{ $loop->iteration }}"><img src="{{ $image->public_url }}" width="96" height="96" alt=""></button>@endforeach</div>@endif
             </div>
             <div class="product-details">
                 <a class="product-category" href="{{ route('storefront.category', $product->category->slug) }}">{{ $product->category->name }}</a>

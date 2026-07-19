@@ -70,6 +70,24 @@ if (detail) {
     detail.querySelector('[data-quantity-minus]')?.addEventListener('click', () => { quantity = Math.max(1, quantity - 1); if (output) output.value = String(quantity); });
     detail.querySelector('[data-quantity-plus]')?.addEventListener('click', () => { quantity = Math.min(99, quantity + 1); if (output) output.value = String(quantity); });
     detail.querySelectorAll<HTMLButtonElement>('[data-gallery-image]').forEach((button) => button.addEventListener('click', () => { const image = detail.querySelector<HTMLImageElement>('[data-gallery-main]'); if (image && button.dataset.galleryImage) image.src = button.dataset.galleryImage; }));
+    const thumbnailRail = detail.querySelector<HTMLElement>('[data-gallery-thumbnails]');
+    if (thumbnailRail && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        let thumbnailTimer: number | undefined;
+        const stopThumbnailLoop = () => { if (thumbnailTimer) window.clearInterval(thumbnailTimer); thumbnailTimer = undefined; };
+        const startThumbnailLoop = () => {
+            stopThumbnailLoop();
+            if (thumbnailRail.scrollWidth <= thumbnailRail.clientWidth + 4) return;
+            thumbnailTimer = window.setInterval(() => {
+                const next = thumbnailRail.scrollLeft + Math.max(96, Math.round(thumbnailRail.clientWidth * 0.45));
+                thumbnailRail.scrollTo({ left: next >= thumbnailRail.scrollWidth - thumbnailRail.clientWidth - 4 ? 0 : next, behavior: 'smooth' });
+            }, 4200);
+        };
+        thumbnailRail.addEventListener('pointerenter', stopThumbnailLoop);
+        thumbnailRail.addEventListener('pointerleave', startThumbnailLoop);
+        thumbnailRail.addEventListener('focusin', stopThumbnailLoop);
+        thumbnailRail.addEventListener('focusout', startThumbnailLoop);
+        startThumbnailLoop();
+    }
     const selected = new Set<number>();
     const variants = JSON.parse(detail.dataset.productVariants ?? '[]') as Variant[];
     const addButton = detail.querySelector<HTMLButtonElement>('[data-add-to-cart]');

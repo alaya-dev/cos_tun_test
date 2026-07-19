@@ -1,4 +1,4 @@
-import { createApp, onMounted, ref } from 'vue';
+import { createApp, onMounted, reactive, ref } from 'vue';
 import { createPinia } from 'pinia';
 import {
     createRouter,
@@ -20,12 +20,17 @@ import {
     feedbackState,
     resolveConfirmation,
     showError,
+    showToast,
 } from './feedback';
 
 const Shell = {
     components: { RouterLink, RouterView },
     setup() {
         const role = ref('');
+        const passwordModalOpen = ref(false);
+        const passwordSaving = ref(false);
+        const passwordError = ref('');
+        const passwordForm = reactive({ current_password: '', password: '', password_confirmation: '' });
         onMounted(async () => {
             const response = await fetch('/api/v1/admin/me', {
                 credentials: 'same-origin',
@@ -55,12 +60,50 @@ const Shell = {
                 showError(cause instanceof Error ? cause.message : 'Déconnexion impossible.');
             }
         };
+        const openPasswordModal = () => {
+            Object.assign(passwordForm, { current_password: '', password: '', password_confirmation: '' });
+            passwordError.value = '';
+            passwordModalOpen.value = true;
+        };
+        const closePasswordModal = () => {
+            if (!passwordSaving.value) passwordModalOpen.value = false;
+        };
+        const changePassword = async () => {
+            passwordSaving.value = true;
+            passwordError.value = '';
+            const csrfToken = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '';
+            try {
+                const response = await fetch('/api/v1/admin/me/password', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+                    body: JSON.stringify(passwordForm),
+                });
+                if (!response.ok) {
+                    const failure = await response.json().catch(() => null) as { message?: string; errors?: Record<string, string[]> } | null;
+                    throw new Error(failure?.errors ? Object.values(failure.errors).flat().join(' ') : failure?.message || 'La modification du mot de passe a échoué.');
+                }
+                passwordModalOpen.value = false;
+                Object.assign(passwordForm, { current_password: '', password: '', password_confirmation: '' });
+                showToast('success', 'Votre mot de passe a été mis à jour.');
+            } catch (cause) {
+                passwordError.value = cause instanceof Error ? cause.message : 'La modification du mot de passe a échoué.';
+            } finally {
+                passwordSaving.value = false;
+            }
+        };
 
         return {
             ...feedbackState,
             dismissError,
             dismissToast,
             logout,
+            openPasswordModal,
+            closePasswordModal,
+            changePassword,
+            passwordModalOpen,
+            passwordSaving,
+            passwordError,
+            passwordForm,
             resolveConfirmation,
             role,
         };
@@ -82,7 +125,7 @@ const Shell = {
           <RouterLink v-if="role === 'super_admin'" to="/users" aria-label="Utilisateurs"><span>Utilisateurs</span></RouterLink>
           <RouterLink v-if="role === 'super_admin'" to="/audit-logs" aria-label="Journal d’audit"><span>Journal d’audit</span></RouterLink>
         </nav>
-        <footer class="admin-profile"><span>Administration</span><button class="text-link" type="button" @click="logout">Déconnexion</button></footer>
+        <footer class="admin-profile"><span>Administration</span><button class="text-link" type="button" @click="openPasswordModal">Mot de passe</button><button class="text-link" type="button" @click="logout">Déconnexion</button></footer>
       </aside>
       <main><div class="admin-topbar"><span>Passion Cosmetic</span><small>Back-office sécurisé</small></div><RouterView v-slot="{ Component }"><Transition name="admin-page" mode="out-in"><component :is="Component" /></Transition></RouterView></main>
       <TransitionGroup name="admin-toast" tag="div" class="admin-toast-stack" aria-live="polite" aria-relevant="additions">
@@ -104,6 +147,12 @@ const Shell = {
           <span class="admin-dialog-mark" :class="confirmationDialog.tone === 'danger' ? 'is-error' : 'is-warning'" aria-hidden="true">!</span>
           <div><p class="admin-eyebrow">Confirmation</p><h2 id="admin-confirmation-title">{{ confirmationDialog.title }}</h2><p id="admin-confirmation-message">{{ confirmationDialog.message }}</p></div>
           <footer><button class="text-link" type="button" @click="resolveConfirmation(false)">Annuler</button><button class="admin-action" :class="{ 'danger-button': confirmationDialog.tone === 'danger' }" type="button" @click="resolveConfirmation(true)">{{ confirmationDialog.confirmLabel }}</button></footer>
+        </section>
+      </div></Transition>
+      <Transition name="admin-overlay"><div v-if="passwordModalOpen" class="admin-overlay" role="presentation" @click.self="closePasswordModal">
+        <section class="admin-password-dialog" role="dialog" aria-modal="true" aria-labelledby="password-modal-title" aria-describedby="password-modal-description">
+          <header><div><p class="admin-eyebrow">Sécurité du compte</p><h2 id="password-modal-title">Modifier mon mot de passe</h2><p id="password-modal-description">Pour votre sécurité, votre mot de passe actuel est requis, y compris pour les Super Admins.</p></div><button class="admin-dialog-close" type="button" aria-label="Fermer" :disabled="passwordSaving" @click="closePasswordModal">×</button></header>
+          <form @submit.prevent="changePassword"><p v-if="passwordError" class="page-error" role="alert">{{ passwordError }}</p><label>Mot de passe actuel<input v-model="passwordForm.current_password" type="password" autocomplete="current-password" required></label><label>Nouveau mot de passe<input v-model="passwordForm.password" type="password" autocomplete="new-password" minlength="8" required><small>8 caractères minimum.</small></label><label>Confirmer le nouveau mot de passe<input v-model="passwordForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required></label><footer><button class="text-link" type="button" :disabled="passwordSaving" @click="closePasswordModal">Annuler</button><button class="admin-action" :disabled="passwordSaving">{{ passwordSaving ? 'Enregistrement…' : 'Mettre à jour' }}</button></footer></form>
         </section>
       </div></Transition>
     </div>`,
