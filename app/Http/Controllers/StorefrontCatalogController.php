@@ -98,30 +98,34 @@ class StorefrontCatalogController extends Controller
             ]);
     }
 
-    /** @param Builder<Product> $query */
-    /**
-     * @param  Builder<Product>  $query
+    /** @param Builder<Product> $query
      * @return Builder<Product>
      */
     private function applyFilters(Builder $query, Request $request): Builder
     {
-        $data = $request->validate([
-            'min_price' => ['nullable', 'integer', 'min:0'],
-            'max_price' => ['nullable', 'integer', 'min:0'],
-            'promotions' => ['nullable', 'boolean'],
-            'sort' => ['nullable', 'in:newest,name_asc,price_asc,price_desc'],
-        ]);
-        if (isset($data['min_price'])) {
-            $query->whereRaw('COALESCE(promotional_price_millimes, regular_price_millimes) >= ?', [$data['min_price']]);
+        $minimumPrice = $this->millimesFromDinars($request->string('min_price_dt')->toString());
+        $maximumPrice = $this->millimesFromDinars($request->string('max_price_dt')->toString());
+        $categorySlug = $request->string('category')->toString();
+        $sort = $request->string('sort')->toString();
+
+        $hasActiveCategory = $categorySlug !== '' && mb_strlen($categorySlug) <= 120 && Category::query()
+            ->where('slug', $categorySlug)
+            ->where('is_active', true)
+            ->exists();
+        if ($hasActiveCategory) {
+            $query->whereHas('category', fn (Builder $categoryQuery) => $categoryQuery->where('slug', $categorySlug)->where('is_active', true));
         }
-        if (isset($data['max_price'])) {
-            $query->whereRaw('COALESCE(promotional_price_millimes, regular_price_millimes) <= ?', [$data['max_price']]);
+        if ($minimumPrice !== null) {
+            $query->whereRaw('COALESCE(promotional_price_millimes, regular_price_millimes) >= ?', [$minimumPrice]);
         }
-        if ($data['promotions'] ?? false) {
+        if ($maximumPrice !== null) {
+            $query->whereRaw('COALESCE(promotional_price_millimes, regular_price_millimes) <= ?', [$maximumPrice]);
+        }
+        if ($request->boolean('promotions')) {
             $query->whereNotNull('promotional_price_millimes');
         }
 
-        match ($data['sort'] ?? 'newest') {
+        match ($sort) {
             'name_asc' => $query->orderBy('name'),
             'price_asc' => $query->orderByRaw('COALESCE(promotional_price_millimes, regular_price_millimes)'),
             'price_desc' => $query->orderByRaw('COALESCE(promotional_price_millimes, regular_price_millimes) DESC'),
@@ -129,6 +133,20 @@ class StorefrontCatalogController extends Controller
         };
 
         return $query;
+    }
+
+    private function millimesFromDinars(string $amount): ?int
+    {
+        $normalized = str_replace(',', '.', trim($amount));
+        if ($normalized === '' || ! preg_match('/^\d+(?:\.\d{1,3})?$/', $normalized)) {
+            return null;
+        }
+
+        $parts = explode('.', $normalized, 2);
+        $whole = $parts[0];
+        $fraction = $parts[1] ?? '';
+
+        return ((int) $whole * 1000) + (int) str_pad($fraction, 3, '0');
     }
 
     private function redirectForLegacyPath(string $path): ?RedirectResponse

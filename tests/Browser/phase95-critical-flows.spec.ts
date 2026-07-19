@@ -1,6 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const browserErrors = new WeakMap<Page, string[]>();
+const responsiveViewports = [
+    { width: 320, height: 740 }, { width: 360, height: 800 }, { width: 390, height: 844 },
+    { width: 430, height: 932 }, { width: 768, height: 1024 }, { width: 1024, height: 768 },
+    { width: 1280, height: 800 }, { width: 1440, height: 900 },
+];
+
+const expectNoPageOverflow = async (page: Page) => {
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+};
 
 test.beforeEach(async ({ page }) => {
     const errors: string[] = [];
@@ -19,6 +28,19 @@ test('public storefront renders French shell', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
     await expect(page.getByText('Passion Cosmetic', { exact: true })).toBeVisible();
+    await expectNoPageOverflow(page);
+});
+
+test('principal public pages do not overflow at supported widths', async ({ page }) => {
+    test.setTimeout(240_000);
+    for (const viewport of responsiveViewports) {
+        await page.setViewportSize(viewport);
+        for (const path of ['/', '/produits', '/panier', '/commande']) {
+            await page.goto(path);
+            await expect(page.locator('main, .error-page')).toBeVisible();
+            await expectNoPageOverflow(page);
+        }
+    }
 });
 
 test('public navigation is keyboard reachable and honors reduced motion', async ({ page }) => {
@@ -35,6 +57,7 @@ test('public checkout and admin login entry points remain reachable in French', 
     await page.goto('/admin/login');
     await expect(page.locator('html')).toHaveAttribute('lang', 'fr');
     await expect(page.locator('form')).toBeVisible();
+    await expectNoPageOverflow(page);
 });
 
 test('checkout retry returns the same safe validation contract', async ({ page }) => {

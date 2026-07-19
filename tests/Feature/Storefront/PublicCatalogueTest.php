@@ -39,6 +39,25 @@ class PublicCatalogueTest extends TestCase
             ->assertDontSee('Zeste');
     }
 
+    public function test_shop_filters_prices_in_visible_dinars_and_recovers_from_invalid_urls(): void
+    {
+        $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage', 'is_active' => true]);
+        $this->product($category, 'Soin accessible', 'soin-accessible', 12_500);
+        $this->product($category, 'Soin premium', 'soin-premium', 31_000);
+
+        $this->get('/produits?min_price_dt=12,500&max_price_dt=20')
+            ->assertOk()
+            ->assertSee('Soin accessible')
+            ->assertDontSee('Soin premium')
+            ->assertSee('Prix minimum')
+            ->assertSee('Effacer les filtres');
+
+        $this->get('/produits?sort=invalide&min_price_dt=pas-un-prix&category=introuvable')
+            ->assertOk()
+            ->assertSee('Soin accessible')
+            ->assertSee('Soin premium');
+    }
+
     public function test_product_page_is_server_rendered_with_canonical_and_structured_data(): void
     {
         $category = Category::query()->create(['name' => 'Visage', 'slug' => 'visage', 'is_active' => true]);

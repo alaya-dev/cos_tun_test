@@ -1,0 +1,1 @@
+@include('errors.fallback', ['status' => 419, 'title' => 'Votre session a expiré', 'message' => 'Actualisez la page, puis réessayez. Votre panier est conservé sur cet appareil.', 'actions' => [['href' => url()->current(), 'label' => 'Actualiser la page'], ['href' => '/panier', 'label' => 'Retour au panier']]])

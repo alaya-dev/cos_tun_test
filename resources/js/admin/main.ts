@@ -1,4 +1,4 @@
-import { createApp, onMounted, reactive, ref } from 'vue';
+import { createApp, nextTick, onMounted, reactive, ref } from 'vue';
 import { createPinia } from 'pinia';
 import {
     createRouter,
@@ -14,6 +14,7 @@ import ProductEditorView from './product-editor';
 import ProductsView from './products';
 import UsersView from './users';
 import AuditLogsView from './audit-logs';
+import AdminNotFoundView from './not-found';
 import {
     dismissError,
     dismissToast,
@@ -31,6 +32,11 @@ const Shell = {
         const passwordSaving = ref(false);
         const passwordError = ref('');
         const passwordForm = reactive({ current_password: '', password: '', password_confirmation: '' });
+        const passwordDialog = ref<HTMLElement | null>(null);
+        const passwordTrigger = ref<HTMLElement | null>(null);
+        const adminNavigationOpen = ref(false);
+        const adminNavigation = ref<HTMLElement | null>(null);
+        const adminNavigationTrigger = ref<HTMLElement | null>(null);
         onMounted(async () => {
             const response = await fetch('/api/v1/admin/me', {
                 credentials: 'same-origin',
@@ -60,13 +66,48 @@ const Shell = {
                 showError(cause instanceof Error ? cause.message : 'Déconnexion impossible.');
             }
         };
-        const openPasswordModal = () => {
+        const openPasswordModal = async (event: MouseEvent) => {
+            passwordTrigger.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
             Object.assign(passwordForm, { current_password: '', password: '', password_confirmation: '' });
             passwordError.value = '';
             passwordModalOpen.value = true;
+            await nextTick();
+            passwordDialog.value?.querySelector<HTMLInputElement>('input')?.focus();
         };
-        const closePasswordModal = () => {
-            if (!passwordSaving.value) passwordModalOpen.value = false;
+        const closePasswordModal = async () => {
+            if (passwordSaving.value) return;
+            passwordModalOpen.value = false;
+            await nextTick();
+            passwordTrigger.value?.focus();
+        };
+        const keepPasswordFocus = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') { void closePasswordModal(); return; }
+            if (event.key !== 'Tab' || !passwordDialog.value) return;
+            const focusable = [...passwordDialog.value.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)')];
+            const first = focusable[0]; const last = focusable.at(-1);
+            if (!first || !last) return;
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        };
+        const openAdminNavigation = async (event: MouseEvent) => {
+            adminNavigationTrigger.value = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+            adminNavigationOpen.value = true;
+            await nextTick();
+            adminNavigation.value?.querySelector<HTMLElement>('a')?.focus();
+        };
+        const closeAdminNavigation = async () => {
+            adminNavigationOpen.value = false;
+            await nextTick();
+            adminNavigationTrigger.value?.focus();
+        };
+        const keepAdminNavigationFocus = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') { void closeAdminNavigation(); return; }
+            if (event.key !== 'Tab' || !adminNavigation.value) return;
+            const focusable = [...adminNavigation.value.querySelectorAll<HTMLElement>('a, button:not(:disabled)')];
+            const first = focusable[0]; const last = focusable.at(-1);
+            if (!first || !last) return;
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
         };
         const changePassword = async () => {
             passwordSaving.value = true;
@@ -104,14 +145,22 @@ const Shell = {
             passwordSaving,
             passwordError,
             passwordForm,
+            passwordDialog,
+            adminNavigationOpen,
+            adminNavigation,
             resolveConfirmation,
+            keepPasswordFocus,
+            openAdminNavigation,
+            closeAdminNavigation,
+            keepAdminNavigationFocus,
             role,
         };
     },
     template: `<div class="admin-shell">
       <aside class="admin-sidebar">
         <a class="admin-brand" href="/admin">PASSION<br><small>COSMETIC · ADMIN</small></a>
-        <nav aria-label="Navigation principale">
+        <button class="admin-menu-button" type="button" aria-label="Ouvrir la navigation" :aria-expanded="adminNavigationOpen" @click="openAdminNavigation($event)"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span>Menu</span></button>
+        <nav ref="adminNavigation" :class="{ 'is-open': adminNavigationOpen }" aria-label="Navigation principale" @keydown="keepAdminNavigationFocus" @click="adminNavigationOpen && closeAdminNavigation()">
           <RouterLink to="/products" aria-label="Produits"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg><span>Produits</span></RouterLink>
           <RouterLink to="/categories" aria-label="Catégories"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12V5h7l9 9-7 7-9-9Z"/><path d="M8 8h.01"/></svg><span>Catégories</span></RouterLink>
           <RouterLink to="/orders" aria-label="Commandes"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l1 13H5L6 7Z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg><span>Commandes</span></RouterLink>
@@ -125,8 +174,9 @@ const Shell = {
           <RouterLink v-if="role === 'super_admin'" to="/users" aria-label="Utilisateurs"><span>Utilisateurs</span></RouterLink>
           <RouterLink v-if="role === 'super_admin'" to="/audit-logs" aria-label="Journal d’audit"><span>Journal d’audit</span></RouterLink>
         </nav>
-        <footer class="admin-profile"><span>Administration</span><button class="text-link" type="button" @click="openPasswordModal">Mot de passe</button><button class="text-link" type="button" @click="logout">Déconnexion</button></footer>
+        <footer class="admin-profile"><span>Administration</span><button class="text-link" type="button" @click="openPasswordModal($event)">Mot de passe</button><button class="text-link" type="button" @click="logout">Déconnexion</button></footer>
       </aside>
+      <button v-if="adminNavigationOpen" class="admin-navigation-backdrop" type="button" aria-label="Fermer la navigation" @click="closeAdminNavigation"></button>
       <main><div class="admin-topbar"><span>Passion Cosmetic</span><small>Back-office sécurisé</small></div><RouterView v-slot="{ Component }"><Transition name="admin-page" mode="out-in"><component :is="Component" /></Transition></RouterView></main>
       <TransitionGroup name="admin-toast" tag="div" class="admin-toast-stack" aria-live="polite" aria-relevant="additions">
         <article v-for="toast in toasts" :key="toast.id" class="admin-toast" :class="'is-' + toast.tone" role="status">
@@ -150,7 +200,7 @@ const Shell = {
         </section>
       </div></Transition>
       <Transition name="admin-overlay"><div v-if="passwordModalOpen" class="admin-overlay" role="presentation" @click.self="closePasswordModal">
-        <section class="admin-password-dialog" role="dialog" aria-modal="true" aria-labelledby="password-modal-title" aria-describedby="password-modal-description">
+        <section ref="passwordDialog" class="admin-password-dialog" role="dialog" aria-modal="true" aria-labelledby="password-modal-title" aria-describedby="password-modal-description" @keydown="keepPasswordFocus">
           <header><div><p class="admin-eyebrow">Sécurité du compte</p><h2 id="password-modal-title">Modifier mon mot de passe</h2><p id="password-modal-description">Pour votre sécurité, votre mot de passe actuel est requis, y compris pour les Super Admins.</p></div><button class="admin-dialog-close" type="button" aria-label="Fermer" :disabled="passwordSaving" @click="closePasswordModal">×</button></header>
           <form @submit.prevent="changePassword"><p v-if="passwordError" class="page-error" role="alert">{{ passwordError }}</p><label>Mot de passe actuel<input v-model="passwordForm.current_password" type="password" autocomplete="current-password" required></label><label>Nouveau mot de passe<input v-model="passwordForm.password" type="password" autocomplete="new-password" minlength="8" required><small>8 caractères minimum.</small></label><label>Confirmer le nouveau mot de passe<input v-model="passwordForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required></label><footer><button class="text-link" type="button" :disabled="passwordSaving" @click="closePasswordModal">Annuler</button><button class="admin-action" :disabled="passwordSaving">{{ passwordSaving ? 'Enregistrement…' : 'Mettre à jour' }}</button></footer></form>
         </section>
@@ -178,6 +228,7 @@ const router = createRouter({
         { path: '/static-pages', component: () => import('./static-pages') },
         { path: '/users', component: UsersView },
         { path: '/audit-logs', component: AuditLogsView },
+        { path: '/:pathMatch(.*)*', component: AdminNotFoundView },
     ],
 });
 

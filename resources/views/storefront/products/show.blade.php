@@ -7,14 +7,14 @@
         'url' => route('storefront.product', $product->slug),
         'offers' => ['@type' => 'Offer', 'priceCurrency' => 'TND', 'price' => number_format($price / 1000, 3, '.', ''), 'availability' => 'https://schema.org/'.($product->has_variants ? 'InStock' : ($product->stock_quantity > 0 ? 'InStock' : 'OutOfStock'))],
     ];
-    $variantsForClient = $product->variants->map(fn ($variant) => ['public_id' => $variant->public_id, 'stock_quantity' => $variant->stock_quantity, 'is_active' => $variant->is_active, 'value_ids' => $variant->values->pluck('id')->values(), 'image_url' => $product->images->firstWhere('product_variant_id', $variant->id)?->public_url]);
+    $variantsForClient = $product->variants->map(fn ($variant) => ['public_id' => $variant->public_id, 'sku' => $variant->sku, 'stock_quantity' => $variant->stock_quantity, 'is_active' => $variant->is_active, 'value_ids' => $variant->values->pluck('id')->values(), 'image_url' => $product->images->firstWhere('product_variant_id', $variant->id)?->public_url]);
     if ($primaryImage?->public_url) $structuredData['image'] = $primaryImage->public_url;
 @endphp
 <x-layouts.storefront :title="($product->seo_title ?: $product->name).' | Passion Cosmetic'" :description="$product->seo_description ?: ($product->short_description ?: Str::limit(strip_tags($product->full_description ?: ''), 155))" :canonical="route('storefront.product', $product->slug)">
     @push('head')<script type="application/ld+json">@json($structuredData, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES)</script>@endpush
     <section class="product-page section">
         <nav class="breadcrumb" aria-label="Fil d’Ariane"><a href="{{ route('storefront.home') }}">Accueil</a><span>/</span><a href="{{ route('storefront.category', $product->category->slug) }}">{{ $product->category->name }}</a><span>/</span><span aria-current="page">{{ $product->name }}</span></nav>
-        <div class="product-layout" data-product-detail data-product-public-id="{{ $product->public_id }}" data-product-variants='@json($variantsForClient)'>
+        <div class="product-layout" data-product-detail data-product-public-id="{{ $product->public_id }}" data-product-stock="{{ $product->stock_quantity ?? 0 }}" data-product-variants='@json($variantsForClient)'>
             <div class="product-gallery" data-gallery>
                 @if($product->images->count() > 1)<div class="gallery-thumbnails" data-gallery-thumbnails tabindex="0" aria-label="Autres images du produit">@foreach($product->images as $image)<button type="button" data-gallery-image="{{ $image->public_url }}" aria-label="Voir l’image {{ $loop->iteration }}"><img src="{{ $image->public_url }}" width="96" height="96" alt=""></button>@endforeach</div>@endif
                 <div class="product-main-image">@if($primaryImage && $primaryImage->public_url)<img src="{{ $primaryImage->public_url }}" width="{{ $primaryImage->width }}" height="{{ $primaryImage->height }}" alt="{{ $primaryImage->alt_text ?: $product->name }}" data-gallery-main>@else<span class="product-image-placeholder">PC</span>@endif</div>
@@ -32,7 +32,7 @@
                 @else
                     <p class="stock-message {{ $product->stock_quantity > 0 ? 'in-stock' : 'out-stock' }}">{{ $product->stock_quantity > 0 ? 'En stock' : 'Indisponible' }}</p>
                 @endif
-                <div class="product-actions"><label class="quantity-control">Quantité <span><button type="button" data-quantity-minus aria-label="Réduire la quantité">−</button><output data-quantity>1</output><button type="button" data-quantity-plus aria-label="Augmenter la quantité">+</button></span></label><button class="button button-dark" type="button" disabled data-add-to-cart>Ajouter au panier</button></div>
+                <div class="product-actions"><label class="quantity-control">Quantité <span><button type="button" data-quantity-minus aria-label="Réduire la quantité">−</button><input data-quantity type="number" min="1" value="1" inputmode="numeric" aria-label="Quantité"><button type="button" data-quantity-plus aria-label="Augmenter la quantité">+</button></span></label><button class="button button-dark" type="button" disabled data-add-to-cart>Ajouter au panier</button></div>
                 <div class="reassurance-row"><span>Paiement à la livraison</span><span>Confirmation par téléphone</span><span>Livraison partout en Tunisie</span></div>
                 @if($product->full_description)<div class="product-description"><h2>À propos de ce soin</h2><div>{!! nl2br(e($product->full_description)) !!}</div></div>@endif
             </div>
