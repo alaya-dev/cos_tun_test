@@ -10,11 +10,16 @@ use Illuminate\Support\Str;
 
 class Order extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'checkout_idempotency_key', 'checkout_payload_hash', 'status', 'customer_name', 'customer_phone',
+        'customer_city', 'customer_address', 'subtotal_millimes', 'product_discount_millimes',
+        'promo_code_discount_millimes', 'shipping_fee_millimes', 'total_millimes', 'promo_code_id',
+        'promo_code_snapshot', 'lock_version', 'archived_at',
+    ];
 
     protected function casts(): array
     {
-        return ['archived_at' => 'datetime'];
+        return ['archived_at' => 'datetime', 'promo_code_snapshot' => 'array'];
     }
 
     protected static function booted(): void
@@ -58,5 +63,14 @@ class Order extends Model
     public function getRouteKeyName(): string
     {
         return 'public_reference';
+    }
+
+    public function promoDiscountPercentage(): int
+    {
+        $snapshot = $this->getAttribute('promo_code_snapshot');
+
+        return is_array($snapshot) && is_numeric($snapshot['discount_percentage'] ?? null)
+            ? (int) $snapshot['discount_percentage']
+            : 0;
     }
 }

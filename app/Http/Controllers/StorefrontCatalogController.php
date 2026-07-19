@@ -6,6 +6,7 @@ use App\Domain\Catalog\Models\Category;
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Catalog\Services\CatalogCacheVersion;
 use App\Domain\Commerce\Models\Order;
+use App\Domain\Content\Services\HomepageContentService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -30,14 +31,9 @@ class StorefrontCatalogController extends Controller
         return view('storefront.confirmation', compact('order'));
     }
 
-    public function home(): View
+    public function home(HomepageContentService $content): View
     {
-        $version = app(CatalogCacheVersion::class)->current();
-        $categories = Cache::store('redis')->remember("pc:cache:storefront:home:categories:{$version}", now()->addMinutes(10), fn () => Category::query()
-            ->where('is_active', true)->orderBy('sort_order')->limit(8)->get());
-        $newProducts = Cache::store('redis')->remember("pc:cache:storefront:home:new-products:{$version}", now()->addMinutes(10), fn () => $this->catalogueQuery()->latest('published_at')->limit(8)->get());
-
-        return view('storefront.home', compact('categories', 'newProducts'));
+        return view('storefront.home', $content->viewModel());
     }
 
     public function products(Request $request): View

@@ -44,6 +44,7 @@ class PublicOrderResource extends JsonResource
                     'field_key' => $value->field_key_snapshot,
                     'label' => $value->label_snapshot,
                     'type' => $value->type_snapshot,
+                    'is_required' => $value->is_required_snapshot,
                     'value' => $value->value,
                 ];
             })->values(),

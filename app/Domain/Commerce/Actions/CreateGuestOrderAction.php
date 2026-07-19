@@ -10,6 +10,9 @@ use App\Domain\Checkout\Services\ShippingCalculator;
 use App\Domain\Commerce\Exceptions\CheckoutConflictException;
 use App\Domain\Commerce\Models\CheckoutField;
 use App\Domain\Commerce\Models\Order;
+use App\Domain\Promotions\Exceptions\PromoCodeUnavailable;
+use App\Domain\Promotions\Services\PromoCodeService;
+use App\Domain\Settings\Services\StoreSettings;
 use Illuminate\Support\Facades\DB;
 
 class CreateGuestOrderAction
@@ -17,6 +20,8 @@ class CreateGuestOrderAction
     public function __construct(
         private readonly ShippingCalculator $shippingCalculator,
         private readonly ResolveCheckoutSubmissionAction $resolveCheckoutSubmissionAction,
+        private readonly PromoCodeService $promoCodes,
+        private readonly StoreSettings $settings,
     ) {}
 
     /**
@@ -71,8 +76,14 @@ class CreateGuestOrderAction
                 $discount += ($regular - $effective) * $item['quantity'];
                 $lines[] = compact('product', 'variant', 'regular', 'effective', 'item');
             }
-            $shipping = $this->shippingCalculator->calculate($subtotal);
-            $order = Order::query()->create(['checkout_idempotency_key' => $idempotencyKey, 'checkout_payload_hash' => $payloadHash, 'status' => 'nouvelle', 'customer_name' => $resolved['customer']['full_name'], 'customer_phone' => $resolved['customer']['phone'], 'customer_city' => $resolved['customer']['city'], 'customer_address' => $resolved['customer']['address'], 'subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'promo_code_discount_millimes' => 0, 'shipping_fee_millimes' => $shipping['fee']['millimes'], 'total_millimes' => $subtotal + $shipping['fee']['millimes']]);
+            if (isset($data['promo_code']) && trim((string) $data['promo_code']) !== '' && ! $this->settings->get('checkout.promo_field_visible')) {
+                throw new PromoCodeUnavailable;
+            }
+            $promotion = isset($data['promo_code']) && trim((string) $data['promo_code']) !== '' ? $this->promoCodes->quote((string) $data['promo_code'], $subtotal, true) : null;
+            $promoDiscount = $promotion['discount_millimes'] ?? 0;
+            $discountedMerchandiseSubtotal = $subtotal - $promoDiscount;
+            $shipping = $this->shippingCalculator->calculate($discountedMerchandiseSubtotal);
+            $order = Order::query()->create(['checkout_idempotency_key' => $idempotencyKey, 'checkout_payload_hash' => $payloadHash, 'status' => 'nouvelle', 'customer_name' => $resolved['customer']['full_name'], 'customer_phone' => $resolved['customer']['phone'], 'customer_city' => $resolved['customer']['city'], 'customer_address' => $resolved['customer']['address'], 'subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'promo_code_discount_millimes' => $promoDiscount, 'shipping_fee_millimes' => $shipping['fee']['millimes'], 'total_millimes' => $discountedMerchandiseSubtotal + $shipping['fee']['millimes'], 'promo_code_id' => $promotion['model']->id ?? null, 'promo_code_snapshot' => $promotion === null ? null : ['code' => $promotion['code'], 'discount_percentage' => $promotion['percentage']]]);
             foreach ($lines as $line) {
                 $product = $line['product'];
                 $variant = $line['variant'];
@@ -85,6 +96,9 @@ class CreateGuestOrderAction
             }
             foreach ($resolved['checkout_values'] as $value) {
                 $order->checkoutValues()->create($value);
+            }
+            if ($promotion !== null) {
+                $this->promoCodes->consume($promotion['model']);
             }
             DB::table('order_status_history')->insert(['order_id' => $order->id, 'from_status' => null, 'to_status' => 'nouvelle', 'created_at' => now()]);
             CheckoutIdempotencyRecord::query()->create(['order_id' => $order->id, 'idempotency_key' => $idempotencyKey, 'canonical_payload_hash' => $payloadHash, 'expires_at' => now()->addDays(7)]);

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminAuthController;
+use App\Http\Controllers\StaticPageController;
 use App\Http\Controllers\StorefrontCatalogController;
 use Illuminate\Support\Facades\Route;
 
@@ -12,6 +13,8 @@ Route::get('/recherche', [StorefrontCatalogController::class, 'search'])->name('
 Route::get('/panier', [StorefrontCatalogController::class, 'cart'])->name('storefront.cart');
 Route::get('/commande', [StorefrontCatalogController::class, 'checkout'])->name('storefront.checkout');
 Route::get('/commande/confirmee/{order}', [StorefrontCatalogController::class, 'confirmation'])->middleware('signed')->name('storefront.confirmation');
+Route::view('/reclamation', 'storefront.complaint')->name('storefront.complaint');
+Route::get('/pages/{slug}', [StaticPageController::class, 'show'])->name('storefront.page');
 
 Route::get('/admin/login', [AdminAuthController::class, 'create'])->name('login');
 Route::post('/admin/login', [AdminAuthController::class, 'store'])->middleware('throttle:5,1')->name('admin.login');

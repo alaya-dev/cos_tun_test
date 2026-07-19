@@ -4,15 +4,22 @@ namespace App\Domain\Commerce\Services;
 
 use App\Domain\Catalog\Models\Product;
 use App\Domain\Checkout\Services\ShippingCalculator;
+use App\Domain\Promotions\Exceptions\PromoCodeUnavailable;
+use App\Domain\Promotions\Services\PromoCodeService;
+use App\Domain\Settings\Services\StoreSettings;
 
 class CartQuoteService
 {
-    public function __construct(private readonly ShippingCalculator $shippingCalculator) {}
+    public function __construct(
+        private readonly ShippingCalculator $shippingCalculator,
+        private readonly PromoCodeService $promoCodes,
+        private readonly StoreSettings $settings,
+    ) {}
 
     /** @param array<int, array{product_public_id: string, variant_public_id: string|null, quantity: int}> $items
      * @return array<string, mixed>
      */
-    public function quote(array $items): array
+    public function quote(array $items, ?string $promoCode = null): array
     {
         $products = Product::public()->with([
             'images' => fn ($query) => $query->where('processing_status', 'ready')->orderByDesc('is_primary')->orderBy('sort_order'),
@@ -29,9 +36,15 @@ class CartQuoteService
             $subtotal += $line['effective_unit_price']['millimes'] * $item['quantity'];
             $canCheckout = $canCheckout && $line['is_available'];
         }
-        $shipping = $this->shippingCalculator->calculate($subtotal);
+        if ($promoCode !== null && trim($promoCode) !== '' && ! $this->settings->get('checkout.promo_field_visible')) {
+            throw new PromoCodeUnavailable;
+        }
+        $promotion = $promoCode !== null && trim($promoCode) !== '' ? $this->promoCodes->quote($promoCode, $subtotal) : null;
+        $promoDiscount = $promotion['discount_millimes'] ?? 0;
+        $discountedMerchandiseSubtotal = $subtotal - $promoDiscount;
+        $shipping = $this->shippingCalculator->calculate($discountedMerchandiseSubtotal);
 
-        return ['items' => $quotedItems, 'pricing' => ['regular_subtotal' => $this->money($regularSubtotal), 'product_discount' => $this->money($regularSubtotal - $subtotal), 'subtotal' => $this->money($subtotal), 'promo_code' => null, 'shipping' => $shipping, 'total' => $this->money($subtotal + $shipping['fee']['millimes'])], 'can_checkout' => $canCheckout && $items !== []];
+        return ['items' => $quotedItems, 'pricing' => ['regular_subtotal' => $this->money($regularSubtotal), 'product_discount' => $this->money($regularSubtotal - $subtotal), 'subtotal' => $this->money($subtotal), 'promo_code' => $promotion === null ? null : ['code' => $promotion['code'], 'discount_percentage' => $promotion['percentage'], 'discount' => $this->money($promoDiscount)], 'shipping' => $shipping, 'total' => $this->money($discountedMerchandiseSubtotal + $shipping['fee']['millimes'])], 'can_checkout' => $canCheckout && $items !== []];
     }
 
     /** @param array{product_public_id: string, variant_public_id: string|null, quantity: int} $item

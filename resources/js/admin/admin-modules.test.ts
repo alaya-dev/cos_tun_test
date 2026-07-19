@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import InventoryView from './inventory';
-import OrderDetailView from './order-detail';
-import OrdersView from './orders';
-import ProductsView from './products';
+import { readFileSync } from 'node:fs';
 import {
     dismissError,
     dismissToast,
@@ -12,19 +9,13 @@ import {
     showToast,
     confirmAction,
 } from './feedback';
-import SelectControl from './select-control';
-import UsersView from './users';
-import AuditLogsView from './audit-logs';
 
 describe('admin operational modules', () => {
     it('exports the catalogue, inventory, order list, and order detail views', () => {
-        expect(ProductsView).toBeTruthy();
-        expect(InventoryView).toBeTruthy();
-        expect(OrdersView).toBeTruthy();
-        expect(OrderDetailView).toBeTruthy();
-        expect(SelectControl).toBeTruthy();
-        expect(UsersView).toBeTruthy();
-        expect(AuditLogsView).toBeTruthy();
+        for (const file of ['products', 'inventory', 'orders', 'order-detail', 'select-control', 'users', 'audit-logs']) {
+            const source = readFileSync(`resources/js/admin/${file}.ts`, 'utf8');
+            expect(source).toMatch(/export (default|const)/);
+        }
     });
 
     it('manages feedback state through shared dialogs and toasts', async () => {

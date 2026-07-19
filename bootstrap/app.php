@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Promotions\Exceptions\PromoCodeUnavailable;
 use App\Http\Middleware\AssignRequestId;
 use App\Http\Responses\ApiErrorCode;
 use App\Http\Responses\ApiResponse;
@@ -28,6 +29,12 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
+
+        $exceptions->render(function (PromoCodeUnavailable $exception, Request $request) {
+            if ($request->is('api/v1/public/*')) {
+                return ApiResponse::error('PROMO_CODE_INVALID', $exception->getMessage(), 422, meta: ['request_id' => $request->attributes->get('request_id')]);
+            }
+        });
 
         $exceptions->render(function (ValidationException $exception, Request $request) {
             if ($request->is('api/*')) {

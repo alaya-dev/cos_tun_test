@@ -2,12 +2,16 @@
 
 namespace App\Domain\Checkout\Actions;
 
+use App\Domain\Commerce\Exceptions\CheckoutConflictException;
 use App\Domain\Commerce\Models\CheckoutField;
+use App\Domain\Settings\Services\StoreSettings;
 use Illuminate\Validation\ValidationException;
 
 class ResolveCheckoutSubmissionAction
 {
     private const FIXED_FIELDS = ['full_name', 'phone', 'city', 'address'];
+
+    public function __construct(private readonly StoreSettings $settings) {}
 
     /**
      * @param  array<string, mixed>  $data
@@ -19,7 +23,7 @@ class ResolveCheckoutSubmissionAction
         $checkoutFields = $fields->map(fn (CheckoutField $field): array => $field->only(['key', 'label', 'type', 'is_required', 'options', 'sort_order']))->values()->all();
         $schemaVersion = $this->schemaVersion($checkoutFields);
         if (! hash_equals($schemaVersion, (string) $data['checkout_schema_version'])) {
-            throw ValidationException::withMessages(['checkout_schema_version' => 'Le formulaire de commande a changé.']);
+            throw new CheckoutConflictException('CHECKOUT_SCHEMA_STALE', 'Le formulaire de commande a changé. Rechargez la page avant de continuer.');
         }
 
         $customer = $data['customer'];
@@ -56,6 +60,7 @@ class ResolveCheckoutSubmissionAction
                 'field_key_snapshot' => $field->key,
                 'label_snapshot' => $field->label,
                 'type_snapshot' => $field->type,
+                'is_required_snapshot' => $field->is_required,
                 'value' => $normalized,
             ];
         }
@@ -72,7 +77,7 @@ class ResolveCheckoutSubmissionAction
     /** @param array<int, array<string, mixed>> $fields */
     public function schemaVersion(array $fields): string
     {
-        return hash('sha256', json_encode($fields, JSON_THROW_ON_ERROR));
+        return hash('sha256', (string) $this->settings->get('checkout.schema_version'));
     }
 
     private function blank(mixed $value): bool
@@ -94,8 +99,7 @@ class ResolveCheckoutSubmissionAction
             'number' => is_numeric($value) ? (int) $value : throw ValidationException::withMessages(['customer.'.$field->key => 'Cette valeur est invalide.']),
             'checkbox' => filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? throw ValidationException::withMessages(['customer.'.$field->key => 'Cette valeur est invalide.']),
             'select', 'radio' => $this->normalizeChoiceField($field, $value),
-            'multiselect' => $this->normalizeMultiChoiceField($field, $value),
-            default => is_string($value) ? trim($value) : $value,
+            default => throw ValidationException::withMessages(['customer.'.$field->key => 'Ce type de champ n’est pas autorisé.']),
         };
     }
 
@@ -108,24 +112,6 @@ class ResolveCheckoutSubmissionAction
         }
 
         return $candidate;
-    }
-
-    /** @return array<int, string> */
-    private function normalizeMultiChoiceField(CheckoutField $field, mixed $value): array
-    {
-        if (! is_array($value)) {
-            throw ValidationException::withMessages(['customer.'.$field->key => 'Cette valeur est invalide.']);
-        }
-
-        $options = $this->optionValues($field);
-        $normalized = array_values(array_unique(array_map(static fn ($item) => is_string($item) ? trim($item) : (string) $item, $value)));
-        foreach ($normalized as $choice) {
-            if ($options !== [] && ! in_array($choice, $options, true)) {
-                throw ValidationException::withMessages(['customer.'.$field->key => 'Cette valeur est invalide.']);
-            }
-        }
-
-        return $normalized;
     }
 
     /** @return array<int, string> */

@@ -1,34 +1,9 @@
 <!doctype html>
-<html lang="fr">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>{{ $title ?? 'Passion Cosmetic' }}</title>
-    <meta name="description" content="{{ $description ?? 'Découvrez des soins et rituels de beauté choisis avec soin.' }}">
-    <link rel="canonical" href="{{ $canonical ?? url()->current() }}">
-    @vite(['resources/css/app.css', 'resources/js/storefront/main.ts'])
-    @stack('head')
-</head>
-<body class="storefront-body">
-    <a class="skip-link" href="#contenu">Aller au contenu</a>
-    <div class="announcement-bar">Paiement à la livraison, partout en Tunisie</div>
-    <header class="store-header">
-        <a class="brand" href="{{ route('storefront.home') }}" aria-label="Passion Cosmetic, accueil">PASSION<span>COSMETIC</span></a>
-        <nav class="desktop-nav" aria-label="Navigation principale">
-            <a href="{{ route('storefront.products') }}">Tous les soins</a>
-            <a href="{{ route('storefront.products', ['promotions' => 1]) }}">Sélection en douceur</a>
-        </nav>
-        <div class="header-actions">
-            <button class="icon-button" type="button" data-search-trigger aria-label="Rechercher"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="5.8"/><path d="m16 16 4.1 4.1"/></svg></button>
-            <a class="header-cart" href="{{ route('storefront.cart') }}" aria-label="Voir le panier">Panier <span data-cart-count aria-hidden="true">0</span></a>
-        </div>
-        <form class="global-search" action="{{ route('storefront.search') }}" role="search" data-global-search>
-            <label class="sr-only" for="global-search-input">Rechercher un produit ou une catégorie</label>
-            <input id="global-search-input" name="q" type="search" autocomplete="off" placeholder="Rechercher un soin, une catégorie..." data-search-input>
-            <button type="submit">Voir les résultats</button><div class="search-suggestions" data-search-suggestions role="status" aria-live="polite"></div>
-        </form>
-    </header>
-    <main id="contenu">{{ $slot }}</main>
-    <footer class="store-footer"><div><span class="eyebrow">Passion Cosmetic</span><p>Des gestes simples, des produits choisis, un rituel qui vous ressemble.</p></div><div class="footer-links"><a href="{{ route('storefront.products') }}">Tous les soins</a><span>À propos</span><span>Contact</span></div><small>© {{ now()->year }} Passion Cosmetic</small></footer>
-</body>
-</html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{ $title ?? 'Passion Cosmetic' }}</title><meta name="description" content="{{ $description ?? 'Découvrez des soins et rituels de beauté choisis avec soin.' }}"><link rel="canonical" href="{{ $canonical ?? url()->current() }}">@vite(['resources/css/app.css', 'resources/js/storefront/main.ts'])@stack('head')</head>
+<body class="storefront-body"><a class="skip-link" href="#contenu">Aller au contenu</a>
+<div class="announcement-bar">{{ $storeContext['announcement_text'] ?: $storeContext['shipping_announcement'] }}</div>
+<header class="store-header"><button class="icon-button mobile-menu-button" type="button" data-drawer-open aria-label="Ouvrir le menu" aria-expanded="false">☰</button><a class="brand" href="{{ route('storefront.home') }}">Passion<span> Cosmetic</span></a><nav class="desktop-nav" aria-label="Navigation principale"><a href="{{ route('storefront.home') }}">Accueil</a><a href="{{ route('storefront.products') }}">Boutique</a>@foreach($navigationCategories->take(4) as $category)<a href="{{ route('storefront.category', $category->slug) }}">{{ $category->name }}</a>@endforeach</nav><div class="header-actions"><button class="icon-button" type="button" data-search-trigger aria-label="Rechercher">⌕</button><a class="header-cart" href="{{ route('storefront.cart') }}" aria-label="Voir le panier">Panier <span data-cart-count aria-hidden="true">0</span></a></div><form class="global-search" action="{{ route('storefront.search') }}" role="search" data-global-search><label class="sr-only" for="global-search-input">Rechercher un produit ou une catégorie</label><input id="global-search-input" name="q" type="search" autocomplete="off" placeholder="Rechercher un soin, une catégorie…" data-search-input><button type="submit">Voir les résultats</button><div class="search-suggestions" data-search-suggestions role="status" aria-live="polite"></div></form></header>
+<div class="mobile-drawer" data-mobile-drawer aria-hidden="true"><button type="button" data-drawer-close aria-label="Fermer le menu">×</button><nav aria-label="Navigation mobile"><a href="{{ route('storefront.home') }}">Accueil</a><a href="{{ route('storefront.products') }}">Boutique</a>@foreach($navigationCategories as $category)<a href="{{ route('storefront.category', $category->slug) }}">{{ $category->name }}</a>@endforeach<a href="{{ route('storefront.complaint') }}">Réclamations</a></nav></div>
+<main id="contenu">{{ $slot }}</main>
+<footer class="store-footer"><div class="footer-brand"><span class="brand">PASSION<span>COSMETIC</span></span><p>{{ $storeContext['footer_statement'] }}</p></div><div><h2>Boutique</h2><a href="{{ route('storefront.products') }}">Tous les soins</a>@foreach($navigationCategories->take(4) as $category)<a href="{{ route('storefront.category', $category->slug) }}">{{ $category->name }}</a>@endforeach</div><div><h2>Aide</h2>@foreach($footerPages as $page)<a href="{{ route('storefront.page', $page->slug) }}">{{ $page->title }}</a>@endforeach<a href="{{ route('storefront.complaint') }}">Faire une réclamation</a></div><div><h2>Contact</h2>@if($storeContext['address'])<p>{{ $storeContext['address'] }}</p>@endif @if($storeContext['phone'])<a href="tel:{{ preg_replace('/\s+/', '', $storeContext['phone']) }}">{{ $storeContext['phone'] }}</a>@endif @if($storeContext['email'])<a href="mailto:{{ $storeContext['email'] }}">{{ $storeContext['email'] }}</a>@endif @foreach($storeContext['social_links'] as $network => $url)<a href="{{ $url }}" rel="noopener noreferrer">{{ ucfirst($network) }}</a>@endforeach</div><div class="footer-bottom"><span>© {{ now()->year }} Passion Cosmetic. Tous droits réservés.</span><a href="#" data-privacy-preferences>Gérer mes préférences de confidentialité</a></div></footer>
+</body></html>

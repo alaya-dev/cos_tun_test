@@ -1,4 +1,4 @@
-import { createApp } from 'vue';
+import { createApp, defineAsyncComponent, onMounted, ref } from 'vue';
 import { createPinia } from 'pinia';
 import {
     createRouter,
@@ -23,9 +23,27 @@ import {
     showError,
 } from './feedback';
 
+const PromotionsView = defineAsyncComponent(() => import('./promotions'));
+const ShippingSettingsView = defineAsyncComponent(() => import('./shipping-settings'));
+const CheckoutFieldsView = defineAsyncComponent(() => import('./checkout-fields'));
+const ContentView = defineAsyncComponent(() => import('./content'));
+const StaticPagesView = defineAsyncComponent(() => import('./static-pages'));
+const ComplaintsView = defineAsyncComponent(() => import('./complaints').then((module) => module.ComplaintsView));
+const ComplaintDetailView = defineAsyncComponent(() => import('./complaints').then((module) => module.ComplaintDetailView));
+
 const Shell = {
     components: { RouterLink, RouterView },
     setup() {
+        const role = ref('');
+        onMounted(async () => {
+            const response = await fetch('/api/v1/admin/me', {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+            if (response.ok) {
+                role.value = ((await response.json()) as { data: { role: string } }).data.role;
+            }
+        });
         const logout = async () => {
             const csrfToken =
                 document.querySelector<HTMLMetaElement>(
@@ -53,6 +71,7 @@ const Shell = {
             dismissToast,
             logout,
             resolveConfirmation,
+            role,
         };
     },
     template: `<div class="admin-shell">
@@ -63,8 +82,14 @@ const Shell = {
           <RouterLink to="/categories" aria-label="Catégories"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 12V5h7l9 9-7 7-9-9Z"/><path d="M8 8h.01"/></svg><span>Catégories</span></RouterLink>
           <RouterLink to="/orders" aria-label="Commandes"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 7h12l1 13H5L6 7Z"/><path d="M9 8V5a3 3 0 0 1 6 0v3"/></svg><span>Commandes</span></RouterLink>
           <RouterLink to="/inventory" aria-label="Inventaire"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 8 9-5 9 5v9l-9 5-9-5V8Z"/><path d="m3 8 9 5 9-5M12 13v9"/></svg><span>Inventaire</span></RouterLink>
-          <RouterLink to="/users" aria-label="Utilisateurs"><span>Utilisateurs</span></RouterLink>
-          <RouterLink to="/audit-logs" aria-label="Journal d’audit"><span>Journal d’audit</span></RouterLink>
+          <RouterLink to="/complaints" aria-label="Réclamations"><span>Réclamations</span></RouterLink>
+          <RouterLink v-if="role === 'super_admin'" to="/promotions"><span>Promotions</span></RouterLink>
+          <RouterLink v-if="role === 'super_admin'" to="/shipping"><span>Livraison</span></RouterLink>
+          <RouterLink v-if="role === 'super_admin'" to="/checkout-fields"><span>Champs commande</span></RouterLink>
+          <RouterLink v-if="role === 'super_admin'" to="/content"><span>Contenu</span></RouterLink>
+          <RouterLink v-if="role === 'super_admin'" to="/static-pages"><span>Pages</span></RouterLink>
+          <RouterLink v-if="role === 'super_admin'" to="/users" aria-label="Utilisateurs"><span>Utilisateurs</span></RouterLink>
+          <RouterLink v-if="role === 'super_admin'" to="/audit-logs" aria-label="Journal d’audit"><span>Journal d’audit</span></RouterLink>
         </nav>
         <footer class="admin-profile"><span>Administration</span><button class="text-link" type="button" @click="logout">Déconnexion</button></footer>
       </aside>
@@ -104,6 +129,13 @@ const router = createRouter({
         { path: '/orders', component: OrdersView },
         { path: '/orders/:reference', component: OrderDetailView },
         { path: '/inventory', component: InventoryView },
+        { path: '/complaints', component: ComplaintsView },
+        { path: '/complaints/:reference', component: ComplaintDetailView },
+        { path: '/promotions', component: PromotionsView },
+        { path: '/shipping', component: ShippingSettingsView },
+        { path: '/checkout-fields', component: CheckoutFieldsView },
+        { path: '/content', component: ContentView },
+        { path: '/static-pages', component: StaticPagesView },
         { path: '/users', component: UsersView },
         { path: '/audit-logs', component: AuditLogsView },
     ],

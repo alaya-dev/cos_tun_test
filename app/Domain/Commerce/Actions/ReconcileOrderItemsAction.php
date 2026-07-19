@@ -73,8 +73,11 @@ class ReconcileOrderItemsAction
                 $subtotal += $effective * $line['quantity'];
                 $discount += ($regular - $effective) * $line['quantity'];
             }
-            $shipping = $this->shippingCalculator->calculate($subtotal);
-            $order->update(['subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'shipping_fee_millimes' => $shipping['fee']['millimes'], 'total_millimes' => $subtotal + $shipping['fee']['millimes'], 'lock_version' => $order->lock_version + 1]);
+            $promoPercentage = $order->promoDiscountPercentage();
+            $promoDiscount = $promoPercentage > 0 ? intdiv($subtotal * $promoPercentage, 100) : 0;
+            $discountedMerchandiseSubtotal = $subtotal - $promoDiscount;
+            $shipping = $this->shippingCalculator->calculate($discountedMerchandiseSubtotal);
+            $order->update(['subtotal_millimes' => $subtotal, 'product_discount_millimes' => $discount, 'promo_code_discount_millimes' => $promoDiscount, 'shipping_fee_millimes' => $shipping['fee']['millimes'], 'total_millimes' => $discountedMerchandiseSubtotal + $shipping['fee']['millimes'], 'lock_version' => $order->lock_version + 1]);
 
             return $order->fresh(['items']) ?? $order;
         });

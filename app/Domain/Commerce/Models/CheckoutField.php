@@ -7,7 +7,7 @@ use Illuminate\Support\Str;
 
 class CheckoutField extends Model
 {
-    protected $guarded = [];
+    protected $fillable = ['key', 'label', 'type', 'options', 'is_required', 'is_active', 'is_system', 'sort_order'];
 
     protected function casts(): array
     {
@@ -17,5 +17,10 @@ class CheckoutField extends Model
     protected static function booted(): void
     {
         static::creating(fn (self $field) => $field->public_id ??= (string) Str::ulid());
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'public_id';
     }
 }

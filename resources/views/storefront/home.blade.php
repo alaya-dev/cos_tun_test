@@ -1,48 +1,44 @@
 <x-layouts.storefront title="Passion Cosmetic | Soins choisis avec intention">
-    <section class="hero-section">
-        <div class="hero-copy reveal">
-            <p class="eyebrow">Le rituel, à votre rythme</p>
-            <h1>Des soins qui invitent à <em>ralentir.</em></h1>
-            <p>Une sélection de gestes simples, de textures sensorielles et de produits choisis avec intention.</p>
-            <a class="button button-dark" href="{{ route('storefront.products') }}">Découvrir les soins <span aria-hidden="true">↗</span></a>
-        </div>
-        <div class="hero-still-life reveal" style="--i: 1" aria-label="Composition éditoriale de produits et de plantes" role="img">
-            <div class="still-life-orb orb-one"></div><div class="still-life-orb orb-two"></div>
-            <div class="still-life-bottle bottle-one">PASSION<small>huile</small></div>
-            <div class="still-life-bottle bottle-two">PC<small>rituel</small></div>
-            <div class="still-life-leaf leaf-one"></div><div class="still-life-leaf leaf-two"></div>
-        </div>
-    </section>
-
-    <section class="section category-section" aria-labelledby="categories-title">
-        <div class="section-heading"><div><p class="eyebrow">Choisir son moment</p><h2 id="categories-title">Par catégorie</h2></div><a class="text-link" href="{{ route('storefront.products') }}">Voir tous les soins <span aria-hidden="true">→</span></a></div>
-        @if($categories->isNotEmpty())
-            <div class="category-rail">
-                @foreach($categories as $category)
-                    <a class="category-link" href="{{ route('storefront.category', $category->slug) }}"><span>{{ $category->name }}</span><i aria-hidden="true">↗</i></a>
+    @if($heroSlides->isNotEmpty())
+        <section class="home-hero" aria-label="Carrousel principal" data-hero-carousel data-autoplay="{{ $store['hero_autoplay_enabled'] ? 'true' : 'false' }}" tabindex="0">
+            <div class="home-hero-slides">
+                @foreach($heroSlides as $slide)
+                    <article class="home-hero-slide {{ $loop->first ? 'is-active' : '' }}" data-hero-slide aria-hidden="{{ $loop->first ? 'false' : 'true' }}">
+                        <picture>
+                            @if($slide->mobile_image_path)<source media="(max-width: 767px)" srcset="{{ Storage::disk('public')->url($slide->mobile_image_path) }}">@endif
+                            <img src="{{ Storage::disk('public')->url($slide->desktop_image_path) }}" alt="{{ $slide->heading }}" width="1600" height="900" {{ $loop->first ? 'fetchpriority=high loading=eager' : 'loading=lazy' }}>
+                        </picture>
+                        <div class="home-hero-copy"><p class="eyebrow">{{ $slide->eyebrow }}</p><h1>{{ $slide->heading }}</h1>@if($slide->supporting_text)<p>{{ $slide->supporting_text }}</p>@endif @if($slide->cta_label && $slide->cta_url)<a class="button button-light" href="{{ $slide->cta_url }}">{{ $slide->cta_label }}</a>@endif</div>
+                    </article>
                 @endforeach
             </div>
-        @else
-            <p class="empty-inline">Les catégories seront bientôt disponibles.</p>
-        @endif
+            @if($heroSlides->count() > 1)<div class="home-hero-controls"><button type="button" data-hero-prev aria-label="Diapositive précédente">←</button><div class="home-hero-dots">@foreach($heroSlides as $slide)<button type="button" data-hero-dot="{{ $loop->index }}" class="{{ $loop->first ? 'is-active' : '' }}" aria-label="Afficher la diapositive {{ $loop->iteration }}"></button>@endforeach</div><button type="button" data-hero-next aria-label="Diapositive suivante">→</button></div>@endif
+        </section>
+    @endif
+
+    <section class="home-section category-explorer" aria-labelledby="category-explorer-title">
+        <div class="home-section-heading"><p class="eyebrow">Explorer</p><h2 id="category-explorer-title">Nos univers</h2></div>
+        <div class="circular-category-rail">
+            @forelse($categories as $category)<a href="{{ route('storefront.category', $category->slug) }}"><span class="circular-category-image">@if($category->image_path)<img src="{{ Storage::disk('public')->url($category->image_path) }}" alt="{{ $category->name }}" width="180" height="180" loading="lazy">@endif</span><strong>{{ $category->name }}</strong></a>@empty<p class="empty-inline">Les catégories seront bientôt disponibles.</p>@endforelse
+        </div>
     </section>
 
-    <section class="section products-section" aria-labelledby="new-products-title">
-        <div class="section-heading"><div><p class="eyebrow">À découvrir</p><h2 id="new-products-title">Les nouveaux rituels</h2></div><a class="text-link" href="{{ route('storefront.products') }}">Voir la boutique <span aria-hidden="true">→</span></a></div>
-        @if($newProducts->isNotEmpty())
-            <div class="product-grid">@foreach($newProducts as $product)<x-storefront.product-card :product="$product" />@endforeach</div>
-        @else
-            <div class="catalogue-empty"><p class="eyebrow">Une sélection arrive</p><h3>Le premier rituel se prépare.</h3><p>Revenez bientôt découvrir nos produits.</p></div>
-        @endif
-    </section>
+    @if($featuredSection = $productSections->first())
+        <section class="home-section bestsellers-intro" aria-labelledby="featured-title"><p class="eyebrow">{{ $featuredSection->eyebrow }}</p><h2 id="featured-title">{{ $featuredSection->title }}</h2>@if($featuredSection->description)<p>{{ $featuredSection->description }}</p>@endif</section>
+        <section class="home-section products-section featured-products" aria-label="Produits mis en avant">@if($featuredSection->products->isNotEmpty())<div class="product-grid">@foreach($featuredSection->products as $product)<x-storefront.product-card :product="$product" />@endforeach</div>@else<p class="empty-inline">Cette sélection sera bientôt disponible.</p>@endif</section>
+    @endif
 
-    <section class="ritual-section section" aria-labelledby="ritual-title" data-ritual-finder data-categories='@json($categories->map(fn($category) => ['name' => $category->name, 'url' => route('storefront.category', $category->slug)]))'>
-        <div><p class="eyebrow">Un peu d’aide</p><h2 id="ritual-title">Trouver son rituel</h2><p>Quelques choix, une sélection à explorer selon votre envie du moment.</p></div>
-        <div id="ritual-finder" aria-live="polite"></div>
-    </section>
+    @foreach($productSections->skip(1) as $section)
+        <section class="home-section products-section" aria-labelledby="section-{{ $section->public_id }}"><div class="home-section-heading"><div><p class="eyebrow">{{ $section->eyebrow }}</p><h2 id="section-{{ $section->public_id }}">{{ $section->title }}</h2>@if($section->description)<p>{{ $section->description }}</p>@endif</div><a class="text-link" href="{{ route('storefront.products') }}">Voir la boutique →</a></div>@if($section->products->isNotEmpty())<div class="product-grid">@foreach($section->products as $product)<x-storefront.product-card :product="$product" />@endforeach</div>@else<p class="empty-inline">Cette sélection sera bientôt disponible.</p>@endif</section>
+    @endforeach
 
-    <section class="editorial-section">
-        <div class="editorial-graphic" aria-hidden="true"><span>01</span><div></div><i></i></div>
-        <div><p class="eyebrow">Le geste juste</p><h2>Un rituel n’a pas besoin d’être compliqué pour faire la différence.</h2><p>Accordez-vous quelques minutes, choisissez une texture que vous aimez, et laissez le reste attendre.</p><a class="text-link" href="{{ route('storefront.products') }}">Composer mon rituel <span aria-hidden="true">→</span></a></div>
-    </section>
+    @if($visualTiles->isNotEmpty())<section class="home-section" aria-labelledby="visual-tiles-title"><div class="home-section-heading"><p class="eyebrow">Explorer autrement</p><h2 id="visual-tiles-title">Chaque moment a son rituel</h2></div><div class="visual-tile-rail">@foreach($visualTiles as $tile)<a class="visual-category-tile" href="{{ route('storefront.category', $tile->category->slug) }}">@if($tile->desktop_image_path || $tile->category->image_path)<picture>@if($tile->mobile_image_path)<source media="(max-width: 767px)" srcset="{{ Storage::disk('public')->url($tile->mobile_image_path) }}">@endif<img src="{{ Storage::disk('public')->url($tile->desktop_image_path ?: $tile->category->image_path) }}" alt="{{ $tile->label }}" width="900" height="1100" loading="lazy"></picture>@endif<span>{{ $tile->label }} →</span></a>@endforeach</div></section>@endif
+
+    @if($editorial)<section class="home-section must-have-section"><div class="must-have-feature">@if($editorial->image_path)<img src="{{ Storage::disk('public')->url($editorial->image_path) }}" alt="{{ $editorial->heading }}" width="1100" height="900" loading="lazy">@endif<div><p class="eyebrow">{{ $editorial->eyebrow }}</p><h2>{{ $editorial->heading }}</h2><p>{{ $editorial->description }}</p>@if($editorial->cta_label && $editorial->cta_url)<a class="button button-light" href="{{ $editorial->cta_url }}">{{ $editorial->cta_label }}</a>@endif</div></div><div class="compact-product-list">@foreach($editorial->products as $product)<x-storefront.product-card :product="$product" />@endforeach</div></section>@endif
+
+    @if($reassuranceItems->isNotEmpty())<section class="home-section reassurance-section" aria-labelledby="reassurance-title"><div class="home-section-heading"><p class="eyebrow">Nos engagements</p><h2 id="reassurance-title">Une expérience simple et rassurante</h2></div><div class="reassurance-grid">@foreach($reassuranceItems as $item)<article><span class="reassurance-icon" aria-hidden="true" data-icon="{{ $item->icon }}">{{ ['payment' => '✓', 'phone' => '☎', 'delivery' => '⌂', 'quality' => '✦'][$item->icon] }}</span><h3>{{ $item->title }}</h3><p>{{ $item->text }}</p></article>@endforeach</div></section>@endif
+
+    @if($socialItems->isNotEmpty())<section class="home-section social-section" aria-labelledby="social-title"><div class="home-section-heading"><p class="eyebrow">Suivez-nous</p><h2 id="social-title">L’univers Passion</h2></div><div class="social-rail">@foreach($socialItems as $item)<a href="{{ $item->url }}" rel="noopener noreferrer"><img src="{{ Storage::disk('public')->url($item->image_path) }}" alt="{{ $item->alt_text }}" width="600" height="600" loading="lazy"></a>@endforeach</div></section>@endif
+
+    @if($brandContent)<section class="home-section brand-seo-section"><h2>{{ $brandContent->heading }}</h2><div class="rich-content">{!! $brandContent->content !!}</div></section>@endif
 </x-layouts.storefront>

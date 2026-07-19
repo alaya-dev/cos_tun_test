@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Domain\Checkout\Actions\ResolveCheckoutSubmissionAction;
 use App\Domain\Commerce\Actions\CreateGuestOrderAction;
 use App\Domain\Commerce\Exceptions\CheckoutConflictException;
 use App\Http\Controllers\Controller;
@@ -16,7 +15,7 @@ use Illuminate\Support\Facades\URL;
 
 class GuestOrderController extends Controller
 {
-    public function __invoke(CreateGuestOrderRequest $request, ResolveCheckoutSubmissionAction $resolver, CreateGuestOrderAction $orders): JsonResponse
+    public function __invoke(CreateGuestOrderRequest $request, CreateGuestOrderAction $orders): JsonResponse
     {
         $key = (string) $request->header('Idempotency-Key');
         if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $key)) {
@@ -31,7 +30,7 @@ class GuestOrderController extends Controller
             return ApiResponse::error('CHECKOUT_IN_PROGRESS', 'Votre commande est en cours de traitement. Réessayez dans un instant.', 409, meta: ['request_id' => $request->attributes->get('request_id')]);
         }
         try {
-            $result = $orders->handle($resolver->handle($request->all()), $key);
+            $result = $orders->handle($request->validated(), $key);
         } catch (CheckoutConflictException $exception) {
             return ApiResponse::error($exception->codeName, $exception->getMessage(), 409, meta: ['request_id' => $request->attributes->get('request_id')]);
         } finally {

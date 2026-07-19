@@ -27,6 +27,8 @@ class CategoryController extends Controller
             ->orderBy(ltrim($sort, '-'), str_starts_with($sort, '-') ? 'desc' : 'asc')
             ->paginate($data['per_page'] ?? 25);
 
+        $categories->getCollection()->transform(fn (Category $category) => array_merge($category->toArray(), ['image_url' => $category->imageUrl()]));
+
         return response()->json(['data' => $categories]);
     }
 
@@ -38,12 +40,12 @@ class CategoryController extends Controller
         $category = Category::query()->create($data);
         $audit->handle('catalog.category_created', $category, $request->user());
 
-        return response()->json(['data' => $category], 201);
+        return response()->json(['data' => array_merge($category->toArray(), ['image_url' => $category->imageUrl()])], 201);
     }
 
     public function show(Category $category): JsonResponse
     {
-        return response()->json(['data' => $category]);
+        return response()->json(['data' => array_merge($category->toArray(), ['image_url' => $category->imageUrl()])]);
     }
 
     public function update(Request $request, Category $category, RecordAuditEventAction $audit): JsonResponse
@@ -62,7 +64,9 @@ class CategoryController extends Controller
 
         $audit->handle('catalog.category_updated', $category, $request->user(), after: ['fields' => array_keys($data)]);
 
-        return response()->json(['data' => $category->fresh()]);
+        $category->refresh();
+
+        return response()->json(['data' => array_merge($category->toArray(), ['image_url' => $category->imageUrl()])]);
     }
 
     public function destroy(Request $request, Category $category, RecordAuditEventAction $audit): JsonResponse
@@ -76,14 +80,16 @@ class CategoryController extends Controller
         return response()->json(['data' => null]);
     }
 
-    public function reorder(Request $request): JsonResponse
+    public function reorder(Request $request, RecordAuditEventAction $audit): JsonResponse
     {
-        $data = $request->validate(['items' => ['required', 'array', 'max:100'], 'items.*.public_id' => ['required', 'ulid', 'distinct'], 'items.*.sort_order' => ['required', 'integer', 'min:0']]);
+        $data = $request->validate(['items' => ['required', 'array', 'min:1', 'max:100'], 'items.*.public_id' => ['required', 'ulid', 'distinct'], 'items.*.sort_order' => ['required', 'integer', 'min:0']]);
         DB::transaction(function () use ($data): void {
             foreach ($data['items'] as $item) {
                 Category::query()->where('public_id', $item['public_id'])->update(['sort_order' => $item['sort_order']]);
             }
         });
+        $category = Category::query()->where('public_id', $data['items'][0]['public_id'])->firstOrFail();
+        $audit->handle('catalog.categories_reordered', $category, $request->user(), after: ['count' => count($data['items'])]);
 
         return response()->json(['data' => null]);
     }

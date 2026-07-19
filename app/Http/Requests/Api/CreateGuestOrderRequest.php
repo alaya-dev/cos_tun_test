@@ -21,6 +21,7 @@ class CreateGuestOrderRequest extends FormRequest
             'customer.phone' => ['sometimes', 'string', 'max:40'],
             'customer.city' => ['sometimes', 'string', 'between:2,160'],
             'customer.address' => ['sometimes', 'string', 'between:5,2000'],
+            'customer.*' => ['nullable'],
             'items' => ['required', 'array', 'min:1', 'max:100'],
             'items.*.product_public_id' => ['required', 'ulid'],
             'items.*.variant_public_id' => ['nullable', 'ulid'],

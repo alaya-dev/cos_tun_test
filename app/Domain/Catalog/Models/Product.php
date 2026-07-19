@@ -3,6 +3,7 @@
 namespace App\Domain\Catalog\Models;
 
 use App\Domain\Catalog\Services\CatalogCacheVersion;
+use App\Domain\Content\Services\HomepageCache;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,8 +25,14 @@ class Product extends Model
     protected static function booted(): void
     {
         static::creating(fn (self $model) => $model->public_id ??= (string) Str::ulid());
-        static::saved(fn () => app(CatalogCacheVersion::class)->bump());
-        static::deleted(fn () => app(CatalogCacheVersion::class)->bump());
+        static::saved(function (): void {
+            app(CatalogCacheVersion::class)->bump();
+            app(HomepageCache::class)->forget();
+        });
+        static::deleted(function (): void {
+            app(CatalogCacheVersion::class)->bump();
+            app(HomepageCache::class)->forget();
+        });
     }
 
     /** @return BelongsTo<Category, $this> */
