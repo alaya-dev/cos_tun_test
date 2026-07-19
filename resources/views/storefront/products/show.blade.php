@@ -7,7 +7,7 @@
         'url' => route('storefront.product', $product->slug),
         'offers' => ['@type' => 'Offer', 'priceCurrency' => 'TND', 'price' => number_format($price / 1000, 3, '.', ''), 'availability' => 'https://schema.org/'.($product->has_variants ? 'InStock' : ($product->stock_quantity > 0 ? 'InStock' : 'OutOfStock'))],
     ];
-    $variantsForClient = $product->variants->map(fn ($variant) => ['public_id' => $variant->public_id, 'stock_quantity' => $variant->stock_quantity, 'is_active' => $variant->is_active, 'value_ids' => $variant->values->pluck('id')->values()]);
+    $variantsForClient = $product->variants->map(fn ($variant) => ['public_id' => $variant->public_id, 'stock_quantity' => $variant->stock_quantity, 'is_active' => $variant->is_active, 'value_ids' => $variant->values->pluck('id')->values(), 'image_url' => $product->images->firstWhere('product_variant_id', $variant->id)?->public_url]);
     if ($primaryImage?->public_url) $structuredData['image'] = $primaryImage->public_url;
 @endphp
 <x-layouts.storefront :title="($product->seo_title ?: $product->name).' | Passion Cosmetic'" :description="$product->seo_description ?: ($product->short_description ?: Str::limit(strip_tags($product->full_description ?: ''), 155))" :canonical="route('storefront.product', $product->slug)">

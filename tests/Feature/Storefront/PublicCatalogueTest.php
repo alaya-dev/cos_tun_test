@@ -80,12 +80,15 @@ class PublicCatalogueTest extends TestCase
         $value = $group->values()->create(['value' => '30 ml', 'sort_order' => 0]);
         $variant = $product->variants()->create(['combination_key' => (string) $value->id, 'stock_quantity' => 3, 'is_active' => true]);
         $variant->values()->sync([$value->id]);
+        $product->images()->create(['product_variant_id' => $variant->id, 'path' => 'products/serum-nuance-30ml.webp', 'processing_status' => 'ready', 'is_primary' => true]);
 
         $this->get('/produits/serum-nuance')
             ->assertOk()
             ->assertSee('Format')
             ->assertSee('30 ml')
-            ->assertSee('data-product-variants', false);
+            ->assertSee('data-product-variants', false)
+            ->assertSee('image_url', false)
+            ->assertSee('serum-nuance-30ml.webp', false);
     }
 
     public function test_homepage_cache_is_invalidated_when_a_product_changes(): void

@@ -18,6 +18,6 @@ class UpdateBackOfficeUserRequest extends FormRequest
         $routeUser = $this->route('user');
         $id = $routeUser instanceof User ? $routeUser->id : null;
 
-        return ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,'.$id], 'role' => ['sometimes', 'in:admin,super_admin'], 'is_active' => ['sometimes', 'boolean'], 'force_password_change' => ['sometimes', 'boolean']];
+        return ['name' => ['sometimes', 'string', 'max:160'], 'email' => ['sometimes', 'email', 'max:255', 'unique:users,email,'.$id], 'role' => ['sometimes', 'in:admin,super_admin'], 'is_active' => ['sometimes', 'boolean'], 'password' => ['nullable', 'string', 'min:15', 'confirmed']];
     }
 }

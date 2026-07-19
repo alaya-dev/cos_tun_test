@@ -33,10 +33,10 @@ const UsersView: Component = {
         const editorOpen = ref(false);
         const editing = ref<User | null>(null);
         const currentUserPublicId = ref('');
-        const form = reactive({ name: '', email: '', role: 'admin', is_active: true, force_password_change: true, password: '', password_confirmation: '' });
+        const form = reactive({ name: '', email: '', role: 'admin', is_active: true, password: '', password_confirmation: '' });
         let debounce: number | undefined;
 
-        const resetForm = () => Object.assign(form, { name: '', email: '', role: 'admin', is_active: true, force_password_change: true, password: '', password_confirmation: '' });
+        const resetForm = () => Object.assign(form, { name: '', email: '', role: 'admin', is_active: true, password: '', password_confirmation: '' });
         const params = () => new URLSearchParams(Object.entries({ search: search.value, role: role.value, is_active: state.value, page: String(page.value), per_page: '15' }).filter(([, value]) => value !== ''));
 
         const load = async () => {
@@ -76,7 +76,7 @@ const UsersView: Component = {
 
         const openEdit = (user: User) => {
             editing.value = user;
-            Object.assign(form, { name: user.name, email: user.email, role: user.role, is_active: user.is_active, force_password_change: user.force_password_change, password: '', password_confirmation: '' });
+            Object.assign(form, { name: user.name, email: user.email, role: user.role, is_active: user.is_active, password: '', password_confirmation: '' });
             formError.value = '';
             editorOpen.value = true;
         };
@@ -86,7 +86,7 @@ const UsersView: Component = {
             formError.value = '';
             try {
                 const payload = editing.value
-                    ? { name: form.name, email: form.email, role: form.role, is_active: form.is_active, force_password_change: form.force_password_change }
+                    ? { name: form.name, email: form.email, role: form.role, is_active: form.is_active, ...(!isCurrentUser(editing.value) && form.password ? { password: form.password, password_confirmation: form.password_confirmation } : {}) }
                     : { ...form };
                 await adminApi(`users${editing.value ? `/${editing.value.public_id}` : ''}`, editing.value ? 'PATCH' : 'POST', payload);
                 editorOpen.value = false;
@@ -113,9 +113,10 @@ const UsersView: Component = {
         };
 
         const isCurrentUser = (user: User | null) => user?.public_id === currentUserPublicId.value;
+        const canEdit = (user: User) => user.role !== 'super_admin' || isCurrentUser(user);
 
         onMounted(() => { void loadCurrentUser(); void load(); });
-        return { users, loading, error, saving, formError, page, meta, search, role, state, editorOpen, editing, form, roleLabel, queueLoad, load, openCreate, openEdit, save, resetFilters, changePage, isCurrentUser,
+        return { users, loading, error, saving, formError, page, meta, search, role, state, editorOpen, editing, form, roleLabel, queueLoad, load, openCreate, openEdit, save, resetFilters, changePage, isCurrentUser, canEdit,
             roleOptions: [{ value: '', label: 'Tous les rôles' }, { value: 'super_admin', label: 'Super Admin' }, { value: 'admin', label: 'Administrateur' }],
             formRoleOptions: [{ value: 'admin', label: 'Administrateur' }, { value: 'super_admin', label: 'Super Admin' }],
             stateOptions: [{ value: '', label: 'Tous les états' }, { value: '1', label: 'Actifs' }, { value: '0', label: 'Inactifs' }],
@@ -128,9 +129,9 @@ const UsersView: Component = {
         <p v-if="error" class="page-error" role="alert">{{ error }} <button class="text-link" type="button" @click="load">Réessayer</button></p>
         <p v-else-if="loading" class="admin-loading">Chargement des utilisateurs…</p>
         <section v-else-if="!users.length" class="admin-empty" aria-live="polite"><strong>Aucun utilisateur ne correspond à ces critères.</strong><span>Modifiez les filtres ou créez un nouvel accès.</span></section>
-        <div v-else class="admin-table users-table"><div class="admin-table-head"><span>Utilisateur</span><span>Rôle</span><span>État</span><span>Action</span></div><article v-for="user in users" :key="user.public_id"><div><strong>{{ user.name }}</strong><small>{{ user.email }}</small></div><span class="admin-badge">{{ roleLabel(user.role) }}</span><span><span class="admin-badge" :class="user.is_active ? 'status-active' : 'warning'">{{ user.is_active ? 'Actif' : 'Inactif' }}</span><small v-if="user.force_password_change">Mot de passe à modifier</small></span><span><button class="text-link" type="button" @click="openEdit(user)">Modifier</button></span></article></div>
+        <div v-else class="admin-table users-table"><div class="admin-table-head"><span>Utilisateur</span><span>Rôle</span><span>État</span><span>Action</span></div><article v-for="user in users" :key="user.public_id"><div><strong>{{ user.name }}</strong><small>{{ user.email }}</small></div><span class="admin-badge">{{ roleLabel(user.role) }}</span><span><span class="admin-badge" :class="user.is_active ? 'status-active' : 'warning'">{{ user.is_active ? 'Actif' : 'Inactif' }}</span></span><span><button v-if="canEdit(user)" class="text-link" type="button" @click="openEdit(user)">Modifier</button><small v-else>Protégé</small></span></article></div>
         <nav v-if="meta.last_page > 1" class="admin-pagination" aria-label="Pagination des utilisateurs"><button class="admin-outline" type="button" :disabled="page === 1" @click="changePage(page - 1)">Précédent</button><span>Page {{ meta.current_page }} sur {{ meta.last_page }} · {{ meta.total }} accès</span><button class="admin-outline" type="button" :disabled="page === meta.last_page" @click="changePage(page + 1)">Suivant</button></nav>
-        <section v-if="editorOpen" class="management-panel" :aria-labelledby="editing ? 'edit-user-title' : 'create-user-title'"><header><div><p class="admin-eyebrow">{{ editing ? 'Modification' : 'Création' }}</p><h2 :id="editing ? 'edit-user-title' : 'create-user-title'">{{ editing ? 'Modifier l’utilisateur' : 'Nouvel utilisateur' }}</h2></div><button class="text-link" type="button" :disabled="saving" @click="editorOpen = false">Fermer</button></header><form class="category-form" @submit.prevent="save"><p v-if="formError" class="page-error" role="alert">{{ formError }}</p><div class="form-grid"><label>Nom complet <b aria-hidden="true">*</b><input v-model.trim="form.name" autocomplete="name" required maxlength="120"></label><label>E-mail professionnel <b aria-hidden="true">*</b><input v-model.trim="form.email" type="email" autocomplete="email" required maxlength="255"></label><label class="toolbar-select">Rôle <b aria-hidden="true">*</b><SelectControl v-model="form.role" :options="formRoleOptions" :disabled="isCurrentUser(editing)" /><small v-if="isCurrentUser(editing)">Votre rôle Super Admin ne peut pas être retiré depuis votre propre compte.</small></label><label v-if="!editing">Mot de passe <b aria-hidden="true">*</b><input v-model="form.password" type="password" autocomplete="new-password" required minlength="15"><small>15 caractères minimum.</small></label><label v-if="!editing">Confirmation <b aria-hidden="true">*</b><input v-model="form.password_confirmation" type="password" autocomplete="new-password" required minlength="15"></label><label class="inline-check">Accès actif <input v-model="form.is_active" type="checkbox" :disabled="isCurrentUser(editing)"></label><label class="inline-check">Demander le changement de mot de passe <input v-model="form.force_password_change" type="checkbox"></label></div><footer class="sticky-save-bar"><button class="text-link" type="button" :disabled="saving" @click="editorOpen = false">Annuler</button><button class="admin-action" :disabled="saving">{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button></footer></form></section>
+        <section v-if="editorOpen" class="management-panel" :aria-labelledby="editing ? 'edit-user-title' : 'create-user-title'"><header><div><p class="admin-eyebrow">{{ editing ? 'Modification' : 'Création' }}</p><h2 :id="editing ? 'edit-user-title' : 'create-user-title'">{{ editing ? 'Modifier l’utilisateur' : 'Nouvel utilisateur' }}</h2></div><button class="text-link" type="button" :disabled="saving" @click="editorOpen = false">Fermer</button></header><form class="category-form" @submit.prevent="save"><p v-if="formError" class="page-error" role="alert">{{ formError }}</p><div class="form-grid"><label>Nom complet <b aria-hidden="true">*</b><input v-model.trim="form.name" autocomplete="name" required maxlength="120"></label><label>E-mail professionnel <b aria-hidden="true">*</b><input v-model.trim="form.email" type="email" autocomplete="email" required maxlength="255"></label><label class="toolbar-select">Rôle <b aria-hidden="true">*</b><SelectControl v-model="form.role" :options="formRoleOptions" :disabled="isCurrentUser(editing)" /><small v-if="isCurrentUser(editing)">Votre rôle Super Admin ne peut pas être retiré depuis votre propre compte.</small></label><label v-if="!editing || !isCurrentUser(editing)">Nouveau mot de passe <b v-if="!editing" aria-hidden="true">*</b><input v-model="form.password" type="password" autocomplete="new-password" :required="!editing" minlength="15"><small>{{ editing ? 'Laissez vide pour le conserver.' : '15 caractères minimum.' }}</small></label><label v-if="!editing || !isCurrentUser(editing)">Confirmation <b v-if="!editing" aria-hidden="true">*</b><input v-model="form.password_confirmation" type="password" autocomplete="new-password" :required="!editing" minlength="15"></label><label class="inline-check">Accès actif <input v-model="form.is_active" type="checkbox" :disabled="isCurrentUser(editing)"></label></div><footer class="sticky-save-bar"><button class="text-link" type="button" :disabled="saving" @click="editorOpen = false">Annuler</button><button class="admin-action" :disabled="saving">{{ saving ? 'Enregistrement…' : 'Enregistrer' }}</button></footer></form></section>
       </section>`,
 };
 

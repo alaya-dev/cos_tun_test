@@ -56,15 +56,11 @@ class UserController extends Controller
         $actor = $request->user();
         abort_unless($actor instanceof User, 401);
         $manage->assertCanChange($user, $actor, $data);
-        $before = $user->only(['name', 'email', 'role', 'is_active', 'force_password_change']);
-        $user->fill($data)->save();
-        $user->increment('auth_version');
-        $audit->handle('user.updated', $user, $actor, before: $before, after: $user->only(['name', 'email', 'role', 'is_active', 'force_password_change']));
+        $before = $user->only(['name', 'email', 'role', 'is_active']);
+        $updatedUser = $manage->update($user, $data);
+        $audit->handle('user.updated', $updatedUser, $actor, before: $before, after: $updatedUser->only(['name', 'email', 'role', 'is_active']));
 
-        $freshUser = $user->fresh();
-        abort_unless($freshUser instanceof User, 500);
-
-        return ApiResponse::success(new UserResource($freshUser));
+        return ApiResponse::success(new UserResource($updatedUser));
     }
 
     public function destroy(UpdateBackOfficeUserRequest $request, User $user, RecordAuditEventAction $audit, ManageBackOfficeUserAction $manage): JsonResponse

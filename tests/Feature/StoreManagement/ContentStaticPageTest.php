@@ -113,9 +113,9 @@ class ContentStaticPageTest extends TestCase
 
         $this->actingAs($superAdmin, 'sanctum')->patchJson('/api/v1/admin/settings/store', [
             'phone' => null, 'email' => null, 'address' => null, 'whatsapp_url' => '+216 12 345 678',
-            'social_links' => ['instagram' => 'https://www.instagram.com/passion/', 'facebook' => null, 'tiktok' => null, 'youtube' => null],
+            'social_links' => ['instagram' => 'https://www.instagram.com/passion/', 'facebook' => 'https://www.facebook.com/passion/', 'tiktok' => null, 'youtube' => null],
             'announcement_text' => null, 'footer_statement' => null, 'hero_autoplay_enabled' => true,
-        ])->assertOk()->assertJsonPath('data.whatsapp_url', 'https://wa.me/21612345678')->assertJsonPath('data.social_links.instagram', 'https://www.instagram.com/passion');
+        ])->assertOk()->assertJsonPath('data.whatsapp_url', 'https://wa.me/21612345678')->assertJsonPath('data.social_links.instagram', 'https://www.instagram.com/passion')->assertJsonPath('data.social_links.facebook', 'https://www.facebook.com/passion');
 
         $this->actingAs($superAdmin, 'sanctum')->patchJson('/api/v1/admin/settings/store', [
             'whatsapp_url' => 'https://user:secret@wa.me/21612345678', 'social_links' => ['instagram' => 'https://user:secret@www.instagram.com/passion'], 'hero_autoplay_enabled' => true,

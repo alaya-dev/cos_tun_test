@@ -42,14 +42,43 @@ class UserManagementAuthorizationTest extends TestCase
             'email' => 'nouvel-admin@example.test',
             'role' => 'admin',
             'is_active' => true,
-            'force_password_change' => true,
             'password' => 'mot-de-passe-solide-2026',
             'password_confirmation' => 'mot-de-passe-solide-2026',
         ])->assertCreated()->json('data.public_id');
 
         $this->actingAs($owner)->patchJson('/api/v1/admin/users/'.$created, [
             'is_active' => false,
-            'force_password_change' => false,
-        ])->assertOk()->assertJsonPath('data.is_active', false)->assertJsonPath('data.force_password_change', false);
+        ])->assertOk()->assertJsonPath('data.is_active', false);
+    }
+
+    public function test_super_admin_can_reset_an_admin_password_without_the_current_password(): void
+    {
+        $owner = User::factory()->create(['role' => 'super_admin', 'is_active' => true]);
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true, 'password' => 'ancien-mot-de-passe']);
+
+        $this->actingAs($owner)->patchJson('/api/v1/admin/users/'.$admin->public_id, [
+            'password' => 'nouveau-mot-de-passe-2026',
+            'password_confirmation' => 'nouveau-mot-de-passe-2026',
+        ])->assertOk();
+
+        $this->assertTrue(password_verify('nouveau-mot-de-passe-2026', (string) $admin->fresh()->password));
+    }
+
+    public function test_super_admin_cannot_update_another_super_admin_but_can_create_one(): void
+    {
+        $owner = User::factory()->create(['role' => 'super_admin', 'is_active' => true]);
+        $otherOwner = User::factory()->create(['role' => 'super_admin', 'is_active' => true]);
+
+        $this->actingAs($owner)->patchJson('/api/v1/admin/users/'.$otherOwner->public_id, ['name' => 'Modification refusée'])
+            ->assertStatus(422);
+
+        $this->actingAs($owner)->postJson('/api/v1/admin/users', [
+            'name' => 'Nouveau Super Admin',
+            'email' => 'nouveau-super-admin@example.test',
+            'role' => 'super_admin',
+            'is_active' => true,
+            'password' => 'mot-de-passe-super-admin-2026',
+            'password_confirmation' => 'mot-de-passe-super-admin-2026',
+        ])->assertCreated()->assertJsonPath('data.role', 'super_admin');
     }
 }
