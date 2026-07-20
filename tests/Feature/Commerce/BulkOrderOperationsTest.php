@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Commerce;
 
+use App\Domain\Catalog\Models\Category;
+use App\Domain\Catalog\Models\Product;
 use App\Domain\Commerce\Models\Order;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -62,6 +64,23 @@ class BulkOrderOperationsTest extends TestCase
         $this->assertNull($order->fresh()->archived_at);
         $this->actingAs($admin, 'sanctum')->getJson('/api/v1/admin/orders')
             ->assertOk()->assertJsonFragment(['public_reference' => $order->public_reference]);
+    }
+
+    public function test_order_detail_includes_the_selected_variant_values(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $category = Category::query()->create(['name' => 'Corps', 'slug' => 'corps-'.str()->random(6), 'is_active' => true]);
+        $product = Product::query()->create(['category_id' => $category->id, 'name' => 'Baume', 'slug' => 'baume-'.str()->random(6), 'regular_price_millimes' => 10_000, 'stock_quantity' => null, 'has_variants' => true, 'is_active' => true]);
+        $group = $product->optionGroups()->create(['name' => 'Format']);
+        $value = $group->values()->create(['value' => '50 ml']);
+        $variant = $product->variants()->create(['sku' => null, 'combination_key' => '50-ml', 'stock_quantity' => 3, 'is_active' => true]);
+        $variant->values()->attach($value);
+        $order = $this->makeOrder('nouvelle');
+        $order->items()->create(['product_id' => $product->id, 'product_variant_id' => $variant->id, 'product_name_snapshot' => $product->name, 'regular_unit_price_millimes' => 10_000, 'effective_unit_price_millimes' => 10_000, 'quantity' => 1, 'line_total_millimes' => 10_000]);
+
+        $this->actingAs($admin, 'sanctum')->getJson('/api/v1/admin/orders/'.$order->public_reference)
+            ->assertOk()
+            ->assertJsonPath('data.order.items.0.variant.values.0.value', '50 ml');
     }
 
     private function makeOrder(string $status): Order
