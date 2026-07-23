@@ -1,61 +1,31 @@
 services:
   - type: web
     name: cos-tuna-demo
-    env: php
+    runtime: docker
     plan: free
-
-    buildCommand: |
-      composer install --no-dev --optimize-autoloader
-      npm install
-      npm run build
-      mkdir -p database
-      touch database/database.sqlite
-      php artisan migrate --force
-      php artisan db:seed --force
-      php artisan storage:link --force
-      php artisan config:cache
-      php artisan route:cache
-      php artisan view:cache
-      php artisan optimize
-
-    startCommand: php artisan serve --host=0.0.0.0 --port=$PORT
-
+    dockerfilePath: Dockerfile
     envVars:
       - key: APP_NAME
         value: "Cos Tuna"
-
       - key: APP_ENV
         value: production
-
       - key: APP_DEBUG
         value: "false"
-
-      - key: APP_URL
-        value: https://cos-tuna-demo.onrender.com
-
       - key: APP_KEY
         sync: false
-
       - key: LOG_CHANNEL
         value: stack
-
       - key: LOG_LEVEL
         value: error
-
       - key: DB_CONNECTION
         value: sqlite
-
       - key: DB_DATABASE
-        value: /opt/render/project/src/database/database.sqlite
-
+        value: /var/www/html/database/database.sqlite
       - key: CACHE_STORE
         value: file
-
       - key: QUEUE_CONNECTION
         value: sync
-
       - key: SESSION_DRIVER
         value: file
-
       - key: FILESYSTEM_DISK
         value: public
