@@ -43,6 +43,7 @@ RUN echo '#!/bin/sh' > /usr/local/bin/entrypoint.sh \
     && echo 'php artisan migrate --force' >> /usr/local/bin/entrypoint.sh \
     && echo 'php artisan db:seed --force' >> /usr/local/bin/entrypoint.sh \
     && echo 'php artisan storage:link --force || true' >> /usr/local/bin/entrypoint.sh \
+    && echo 'php artisan optimize:clear' >> /usr/local/bin/entrypoint.sh \
     && echo 'php artisan config:cache' >> /usr/local/bin/entrypoint.sh \
     && echo 'php artisan route:cache' >> /usr/local/bin/entrypoint.sh \
     && echo 'php artisan view:cache' >> /usr/local/bin/entrypoint.sh \
