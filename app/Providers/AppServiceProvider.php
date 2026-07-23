@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\ServiceProvider;
 use App\Domain\Catalog\Models\Category;
 use App\Domain\Checkout\Services\ShippingCalculator;
 use App\Domain\Content\Models\StaticPage;
