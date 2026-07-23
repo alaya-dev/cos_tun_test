@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
     {
         User::query()->firstOrCreate(
             ['email' => 'test@example.com'],
-            ['name' => 'Test User', 'password' => Hash::make('password')],
+            ['public_id' => (string) \Illuminate\Support\Str::ulid(), 'name' => 'Test User', 'password' => Hash::make('password')],
         );
 
         $this->call(PassionCatalogSeeder::class);

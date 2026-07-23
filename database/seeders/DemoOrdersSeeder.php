@@ -14,11 +14,11 @@ class DemoOrdersSeeder extends Seeder
     {
         $category = Category::query()->firstOrCreate(
             ['slug' => 'demo-soins'],
-            ['name' => 'Soins démo', 'description' => 'Produits de démonstration pour le back-office.', 'is_active' => true, 'sort_order' => 9_999],
+            ['public_id' => (string) Str::ulid(), 'name' => 'Soins démo', 'description' => 'Produits de démonstration pour le back-office.', 'is_active' => true, 'sort_order' => 9_999],
         );
         $product = Product::query()->firstOrCreate(
             ['slug' => 'serum-demo-commandes'],
-            ['category_id' => $category->id, 'name' => 'Sérum démo commandes', 'regular_price_millimes' => 49_000, 'stock_quantity' => 50, 'is_active' => true, 'has_variants' => false, 'published_at' => now()],
+            ['public_id' => (string) Str::ulid(), 'category_id' => $category->id, 'name' => 'Sérum démo commandes', 'regular_price_millimes' => 49_000, 'stock_quantity' => 50, 'is_active' => true, 'has_variants' => false, 'published_at' => now()],
         );
 
         foreach ([

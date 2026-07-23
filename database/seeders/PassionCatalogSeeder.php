@@ -24,7 +24,7 @@ class PassionCatalogSeeder extends Seeder
         foreach ($categories as $sortOrder => $category) {
             $model = Category::query()->updateOrCreate(
                 ['slug' => $category['slug']],
-                [...$category, 'is_active' => true, 'sort_order' => $sortOrder],
+                [...$category, 'public_id' => (string) \Illuminate\Support\Str::ulid(), 'is_active' => true, 'sort_order' => $sortOrder],
             );
             $categoryIds[$category['slug']] = $model->id;
         }
@@ -46,6 +46,7 @@ class PassionCatalogSeeder extends Seeder
             Product::query()->updateOrCreate(
                 ['slug' => $product['slug']],
                 [
+                    'public_id' => (string) \Illuminate\Support\Str::ulid(),
                     'category_id' => $categoryIds[$product['category']],
                     'name' => $product['name'],
                     'regular_price_millimes' => $product['price'],
