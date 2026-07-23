@@ -10,11 +10,11 @@ class CatalogCacheVersion
 
     public function current(): int
     {
-        return (int) Cache::store('redis')->rememberForever(self::KEY, fn () => 1);
+        return (int) Cache::rememberForever(self::KEY, fn () => 1);
     }
 
     public function bump(): void
     {
-        Cache::store('redis')->increment(self::KEY);
+        Cache::increment(self::KEY);
     }
 }

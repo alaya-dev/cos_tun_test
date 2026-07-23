@@ -19,7 +19,7 @@ class StoreSettings
         if (! Schema::hasTable('settings')) {
             return $this->defaultValue($key, $definition['default']);
         }
-        $cache = Cache::store('redis');
+        $cache = Cache::store();
         $setting = Setting::query()->where('key', $key)->first();
         if (! $setting) {
             $cache->forget(self::CACHE_PREFIX.$key);
@@ -45,16 +45,16 @@ class StoreSettings
         DB::transaction(function () use ($values, $actorId): void {
             foreach ($values as $key => $value) {
                 Setting::query()->updateOrCreate(['key' => $key], ['value' => $value, 'updated_by' => $actorId]);
-                DB::afterCommit(fn () => Cache::store('redis')->forget(self::CACHE_PREFIX.$key));
+                DB::afterCommit(fn () => Cache::forget(self::CACHE_PREFIX.$key));
             }
-            DB::afterCommit(fn () => Cache::store('redis')->forget('pc:cache:storefront:home'));
-            DB::afterCommit(fn () => Cache::store('redis')->forget('pc:cache:storefront:layout'));
+            DB::afterCommit(fn () => Cache::forget('pc:cache:storefront:home'));
+            DB::afterCommit(fn () => Cache::forget('pc:cache:storefront:layout'));
         });
         foreach (array_keys($values) as $key) {
-            Cache::store('redis')->forget(self::CACHE_PREFIX.$key);
+            Cache::forget(self::CACHE_PREFIX.$key);
         }
-        Cache::store('redis')->forget('pc:cache:storefront:home');
-        Cache::store('redis')->forget('pc:cache:storefront:layout');
+        Cache::forget('pc:cache:storefront:home');
+        Cache::forget('pc:cache:storefront:layout');
     }
 
     public function incrementSchemaVersion(int $actorId): int
@@ -63,13 +63,13 @@ class StoreSettings
             $setting = Setting::query()->where('key', 'checkout.schema_version')->lockForUpdate()->firstOrFail();
             $next = (int) $setting->value + 1;
             $setting->update(['value' => $next, 'updated_by' => $actorId]);
-            DB::afterCommit(fn () => Cache::store('redis')->forget(self::CACHE_PREFIX.'checkout.schema_version'));
-            DB::afterCommit(fn () => Cache::store('redis')->forget('pc:cache:storefront:home'));
+            DB::afterCommit(fn () => Cache::forget(self::CACHE_PREFIX.'checkout.schema_version'));
+            DB::afterCommit(fn () => Cache::forget('pc:cache:storefront:home'));
 
             return $next;
         });
-        Cache::store('redis')->forget(self::CACHE_PREFIX.'checkout.schema_version');
-        Cache::store('redis')->forget('pc:cache:storefront:home');
+        Cache::forget(self::CACHE_PREFIX.'checkout.schema_version');
+        Cache::forget('pc:cache:storefront:home');
 
         return $next;
     }

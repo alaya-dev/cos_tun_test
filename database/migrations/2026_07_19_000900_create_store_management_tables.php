@@ -204,9 +204,11 @@ return new class extends Migration
             $table->index(['complaint_id', 'created_at']);
         });
 
-        DB::statement('ALTER TABLE promo_codes ADD CONSTRAINT promo_codes_percentage_check CHECK (discount_percentage BETWEEN 1 AND 100)');
-        DB::statement('ALTER TABLE promo_codes ADD CONSTRAINT promo_codes_usage_check CHECK (usage_count <= usage_limit)');
-        DB::statement("ALTER TABLE complaints ADD CONSTRAINT complaints_status_check CHECK (status IN ('nouvelle','en_cours','resolue'))");
+        if (DB::getDriverName() !== 'sqlite') {
+            DB::statement('ALTER TABLE promo_codes ADD CONSTRAINT promo_codes_percentage_check CHECK (discount_percentage BETWEEN 1 AND 100)');
+            DB::statement('ALTER TABLE promo_codes ADD CONSTRAINT promo_codes_usage_check CHECK (usage_count <= usage_limit)');
+            DB::statement("ALTER TABLE complaints ADD CONSTRAINT complaints_status_check CHECK (status IN ('nouvelle','en_cours','resolue'))");
+        }
 
         DB::table('homepage_sections')->insert([[
             'public_id' => (string) Str::ulid(), 'type' => 'new_products', 'eyebrow' => 'À découvrir',

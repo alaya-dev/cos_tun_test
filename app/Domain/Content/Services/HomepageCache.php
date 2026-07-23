@@ -10,7 +10,7 @@ class HomepageCache
 
     public function forget(): void
     {
-        Cache::store('redis')->forget(self::KEY);
-        Cache::store('redis')->forget('pc:cache:storefront:layout');
+        Cache::forget(self::KEY);
+        Cache::forget('pc:cache:storefront:layout');
     }
 }

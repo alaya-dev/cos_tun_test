@@ -59,7 +59,7 @@ class StorefrontCatalogController extends Controller
     public function product(string $slug): View|RedirectResponse
     {
         $version = app(CatalogCacheVersion::class)->current();
-        $product = Cache::store('redis')->remember("pc:cache:storefront:product:{$slug}:{$version}", now()->addMinutes(10), fn () => $this->catalogueQuery()->where('slug', $slug)->first());
+        $product = Cache::remember("pc:cache:storefront:product:{$slug}:{$version}", now()->addMinutes(10), fn () => $this->catalogueQuery()->where('slug', $slug)->first());
         if (! $product) {
             return $this->redirectForLegacyPath('/produits/'.$slug) ?? abort(404);
         }

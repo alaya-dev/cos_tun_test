@@ -8,7 +8,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\CreateGuestOrderRequest;
 use App\Http\Resources\PublicOrderResource;
 use App\Http\Responses\ApiResponse;
-use Illuminate\Cache\RedisStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\URL;
@@ -21,11 +20,7 @@ class GuestOrderController extends Controller
         if (! preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i', $key)) {
             return ApiResponse::error('VALIDATION_ERROR', 'La demande de commande est invalide.', 422);
         }
-        $store = Cache::store('redis')->getStore();
-        if (! $store instanceof RedisStore) {
-            abort(503);
-        }
-        $lock = $store->lock('pc:checkout:'.$key, 15);
+        $lock = Cache::lock('pc:checkout:'.$key, 15);
         if (! $lock->get()) {
             return ApiResponse::error('CHECKOUT_IN_PROGRESS', 'Votre commande est en cours de traitement. Réessayez dans un instant.', 409, meta: ['request_id' => $request->attributes->get('request_id')]);
         }

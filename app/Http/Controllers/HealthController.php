@@ -17,7 +17,7 @@ class HealthController extends Controller
     {
         try {
             DB::connection()->getPdo();
-            Cache::store('redis')->get('health:ready');
+            Cache::get('health:ready');
         } catch (\Throwable) {
             return response()->json(['status' => 'unavailable'], 503);
         }

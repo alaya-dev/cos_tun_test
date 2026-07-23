@@ -58,7 +58,7 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('complaints.manage', [ComplaintPolicy::class, 'manage']);
 
         View::composer('components.layouts.storefront', function ($view): void {
-            $context = Cache::store('redis')->remember('pc:cache:storefront:layout', now()->addMinutes(10), function (): array {
+            $context = Cache::remember('pc:cache:storefront:layout', now()->addMinutes(10), function (): array {
                 $settings = app(StoreSettings::class);
                 $shipping = app(ShippingCalculator::class);
 

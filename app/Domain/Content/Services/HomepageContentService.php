@@ -23,13 +23,13 @@ class HomepageContentService
     /** @return array<string, mixed> */
     public function viewModel(): array
     {
-        return Cache::store('redis')->remember(HomepageCache::KEY, now()->addMinutes(10), function (): array {
+        return Cache::remember(HomepageCache::KEY, now()->addMinutes(10), function (): array {
             $productSections = HomepageSection::query()->where('is_active', true)->with(['products' => fn ($query) => $query->public()->with('images')])->orderBy('sort_order')->get();
             foreach ($productSections as $section) {
                 if ($section->type === 'new_products') {
                     $section->setRelation('products', Product::public()->with('images')->latest('published_at')->limit(8)->get());
                 } elseif ($section->type === 'best_sellers' && $section->products->isEmpty()) {
-                    $ids = DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')->where('orders.status', 'livree')->groupBy('order_items.product_id')->orderByRaw('SUM(order_items.quantity) DESC')->limit(8)->pluck('order_items.product_id');
+                    $ids = DB::table('order_items')->join('orders', 'orders.id', '=', 'order_items.order_id')->where('orders.status', 'livree')->select('order_items.product_id')->groupBy('order_items.product_id')->orderByRaw('SUM(order_items.quantity) DESC')->limit(8)->pluck('order_items.product_id');
                     $section->setRelation('products', Product::public()->with('images')->whereIn('id', $ids)->get()->sortBy(fn (Product $product) => array_search($product->id, $ids->all(), true))->values());
                 }
             }
